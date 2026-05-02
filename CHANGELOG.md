@@ -1,3 +1,9 @@
+## [0.0.75](https://github.com/involvex/youtube-music-cli/compare/v0.0.74...v0.0.75) (2026-05-02)
+
+### Features
+
+- **settings:** add LLM endpoint and base URL configuration options ([154cfe6](https://github.com/involvex/youtube-music-cli/commit/154cfe68a7d6697e2e1405832459f394168952aa))
+
 ## [0.0.74](https://github.com/involvex/youtube-music-cli/compare/v0.0.73...v0.0.74) (2026-04-29)
 
 ## [0.0.73](https://github.com/involvex/youtube-music-cli/compare/v0.0.72...v0.0.73) (2026-04-29)
