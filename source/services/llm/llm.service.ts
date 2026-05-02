@@ -37,6 +37,10 @@ class LLMService {
 
 	private requestTimestamps: number[] = [];
 
+	private baseUrl = GEMINI_API_BASE;
+
+	private endpoint = '';
+
 	constructor() {
 		this.loadConfig();
 	}
@@ -63,6 +67,12 @@ class LLMService {
 		}
 		if (llmConfig?.maxMessagesInContext) {
 			this.maxMessagesInContext = llmConfig.maxMessagesInContext;
+		}
+		if (llmConfig?.baseUrl) {
+			this.baseUrl = llmConfig.baseUrl;
+		}
+		if (llmConfig?.endpoint) {
+			this.endpoint = llmConfig.endpoint;
 		}
 	}
 
@@ -194,7 +204,9 @@ Be concise and helpful. Use tools to fulfill user requests.`;
 		messages: GeminiContent[],
 		tools: ToolDefinition[],
 	): Promise<LLMResponse> {
-		const url = `${GEMINI_API_BASE}/models/${this.model}:generateContent?key=${this.apiKey}`;
+		const url = this.endpoint
+			? `${this.endpoint}?key=${this.apiKey}`
+			: `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
 
 		const body = {
 			contents: messages,
@@ -322,6 +334,8 @@ Be concise and helpful. Use tools to fulfill user requests.`;
 			temperature: this.temperature,
 			maxTokens: this.maxTokens,
 			maxMessagesInContext: this.maxMessagesInContext,
+			baseUrl: this.baseUrl,
+			endpoint: this.endpoint,
 		};
 	}
 }

@@ -1,5 +1,5 @@
 // LLM type definitions
-export type LLMProvider = 'gemini' | 'openai' | 'anthropic';
+export type LLMProvider = 'gemini' | 'openai' | 'anthropic' | 'custom';
 
 export interface LLMConfig {
 	provider?: LLMProvider;
@@ -8,6 +8,8 @@ export interface LLMConfig {
 	temperature?: number;
 	maxTokens?: number;
 	maxMessagesInContext?: number;
+	baseUrl?: string;
+	endpoint?: string;
 }
 
 export interface LLMUsage {

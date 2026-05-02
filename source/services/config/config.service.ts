@@ -271,24 +271,28 @@ class ConfigService {
 
 	getLLMConfig():
 		| {
-				provider?: 'gemini' | 'openai' | 'anthropic';
+				provider?: 'gemini' | 'openai' | 'anthropic' | 'custom';
 				apiKey?: string;
 				model?: string;
 				temperature?: number;
 				maxTokens?: number;
 				maxMessagesInContext?: number;
+				baseUrl?: string;
+				endpoint?: string;
 		  }
 		| undefined {
 		return this.config.llm;
 	}
 
 	setLLMConfig(config: {
-		provider?: 'gemini' | 'openai' | 'anthropic';
+		provider?: 'gemini' | 'openai' | 'anthropic' | 'custom';
 		apiKey?: string;
 		model?: string;
 		temperature?: number;
 		maxTokens?: number;
 		maxMessagesInContext?: number;
+		baseUrl?: string;
+		endpoint?: string;
 	}): void {
 		this.config.llm = config;
 		this.save();

@@ -9,7 +9,6 @@ import {useKeyBinding} from '../../hooks/useKeyboard.ts';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {useSleepTimer} from '../../hooks/useSleepTimer.ts';
 import {formatTime} from '../../utils/format.ts';
-import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
 import type {
 	DownloadFormat,
 	EqualizerPreset,
@@ -41,6 +40,8 @@ const SETTINGS_ITEMS = [
 	'LLM API Key',
 	'LLM Model',
 	'LLM Temperature',
+	'LLM Endpoint',
+	'LLM Base URL',
 	'Downloads Enabled',
 	'Download Folder',
 	'Download Format',
@@ -98,9 +99,16 @@ export default function Settings() {
 	const [llmTemperature, setLLMTemperature] = useState(
 		config.getLLMConfig()?.temperature ?? 0.7,
 	);
+	const [llmEndpoint, setLLMEndpoint] = useState(
+		config.getLLMConfig()?.endpoint ?? '',
+	);
+	const [llmBaseUrl, setLLMBaseUrl] = useState(
+		config.getLLMConfig()?.baseUrl ?? '',
+	);
 	const [isEditingDownloadDirectory, setIsEditingDownloadDirectory] =
 		useState(false);
 	const [isEditingApiKey, setIsEditingApiKey] = useState(false);
+	const [isEditingBaseUrl, setIsEditingBaseUrl] = useState(false);
 	const {
 		isActive,
 		activeMinutes,
@@ -109,14 +117,18 @@ export default function Settings() {
 		cancelTimer,
 		presets,
 	} = useSleepTimer();
-	useKeyboardBlocker(isEditingDownloadDirectory);
-	useKeyboardBlocker(isEditingApiKey);
 
 	const navigateUp = () => {
+		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
+			return;
+		}
 		setSelectedIndex(prev => Math.max(0, prev - 1));
 	};
 
 	const navigateDown = (): void => {
+		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
+			return;
+		}
 		setSelectedIndex(prev => Math.min(SETTINGS_ITEMS.length - 1, prev + 1));
 	};
 
@@ -214,6 +226,8 @@ export default function Settings() {
 			'gemini-2.0-flash',
 			'gemini-2.0-flash-lite',
 			'gemini-1.5-flash',
+			'kilo-auto/free',
+			'kilo-auto/pro',
 		];
 		const currentIndex = models.indexOf(llmModel);
 		const nextModel = models[(currentIndex + 1) % models.length]!;
@@ -227,6 +241,18 @@ export default function Settings() {
 		const nextTemp = temps[(currentIndex + 1) % temps.length]!;
 		setLLMTemperature(nextTemp);
 		config.setLLMConfig({...config.getLLMConfig(), temperature: nextTemp});
+	};
+
+	const cycleLLMEndpoint = () => {
+		const endpoints = [
+			'',
+			'https://api.kilogateway.com/v1/chat/completions',
+			'https://api.openai.com/v1/chat/completions',
+		];
+		const currentIndex = endpoints.indexOf(llmEndpoint);
+		const nextEndpoint = endpoints[(currentIndex + 1) % endpoints.length]!;
+		setLLMEndpoint(nextEndpoint);
+		config.setLLMConfig({...config.getLLMConfig(), endpoint: nextEndpoint});
 	};
 
 	const cycleSleepTimer = () => {
@@ -270,18 +296,22 @@ export default function Settings() {
 		} else if (selectedIndex === 12) {
 			cycleLLMTemperature();
 		} else if (selectedIndex === 13) {
-			toggleDownloadsEnabled();
+			cycleLLMEndpoint();
 		} else if (selectedIndex === 14) {
-			setIsEditingDownloadDirectory(true);
+			setIsEditingBaseUrl(true);
 		} else if (selectedIndex === 15) {
-			cycleDownloadFormat();
+			toggleDownloadsEnabled();
 		} else if (selectedIndex === 16) {
-			cycleSleepTimer();
+			setIsEditingDownloadDirectory(true);
 		} else if (selectedIndex === 17) {
-			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
+			cycleDownloadFormat();
 		} else if (selectedIndex === 18) {
-			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
+			cycleSleepTimer();
 		} else if (selectedIndex === 19) {
+			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
+		} else if (selectedIndex === 20) {
+			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
+		} else if (selectedIndex === 21) {
 			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
 		}
 	};
@@ -418,21 +448,6 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 6 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 6 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 6}
-				>
-					Desktop Notifications: {notifications ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Discord Rich Presence */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
 						selectedIndex === 7 ? theme.colors.primary : undefined
 					}
 					color={
@@ -440,11 +455,11 @@ export default function Settings() {
 					}
 					bold={selectedIndex === 7}
 				>
-					Discord Rich Presence: {discordRpc ? 'ON' : 'OFF'}
+					Desktop Notifications: {notifications ? 'ON' : 'OFF'}
 				</Text>
 			</Box>
 
-			{/* LLM Enabled */}
+			{/* Discord Rich Presence */}
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
@@ -455,13 +470,28 @@ export default function Settings() {
 					}
 					bold={selectedIndex === 8}
 				>
+					Discord Rich Presence: {discordRpc ? 'ON' : 'OFF'}
+				</Text>
+			</Box>
+
+			{/* LLM Enabled */}
+			<Box paddingX={1}>
+				<Text
+					backgroundColor={
+						selectedIndex === 9 ? theme.colors.primary : undefined
+					}
+					color={
+						selectedIndex === 9 ? theme.colors.background : theme.colors.text
+					}
+					bold={selectedIndex === 9}
+				>
 					AI Assistant: {llmEnabled ? 'ON' : 'OFF'}
 				</Text>
 			</Box>
 
 			{/* LLM API Key */}
 			<Box paddingX={1}>
-				{isEditingApiKey && selectedIndex === 9 ? (
+				{isEditingApiKey && selectedIndex === 10 ? (
 					<TextInput
 						value={llmApiKey}
 						onChange={setLLMApiKey}
@@ -477,12 +507,12 @@ export default function Settings() {
 				) : (
 					<Text
 						backgroundColor={
-							selectedIndex === 9 ? theme.colors.primary : undefined
+							selectedIndex === 10 ? theme.colors.primary : undefined
 						}
 						color={
-							selectedIndex === 9 ? theme.colors.background : theme.colors.text
+							selectedIndex === 10 ? theme.colors.background : theme.colors.text
 						}
-						bold={selectedIndex === 9}
+						bold={selectedIndex === 10}
 					>
 						API Key:{' '}
 						{llmApiKey
@@ -496,21 +526,6 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 10 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 10 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 10}
-				>
-					Model: {llmModel}
-				</Text>
-			</Box>
-
-			{/* LLM Temperature */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
 						selectedIndex === 11 ? theme.colors.primary : undefined
 					}
 					color={
@@ -518,11 +533,11 @@ export default function Settings() {
 					}
 					bold={selectedIndex === 11}
 				>
-					Temperature: {llmTemperature.toFixed(1)}
+					Model: {llmModel}
 				</Text>
 			</Box>
 
-			{/* Downloads Enabled */}
+			{/* LLM Temperature */}
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
@@ -533,13 +548,79 @@ export default function Settings() {
 					}
 					bold={selectedIndex === 12}
 				>
+					Temperature: {llmTemperature.toFixed(1)}
+				</Text>
+			</Box>
+
+			{/* LLM Endpoint */}
+			<Box paddingX={1}>
+				<Text
+					backgroundColor={
+						selectedIndex === 13 ? theme.colors.primary : undefined
+					}
+					color={
+						selectedIndex === 13 ? theme.colors.background : theme.colors.text
+					}
+					bold={selectedIndex === 13}
+				>
+					Endpoint:{' '}
+					{llmEndpoint
+						? llmEndpoint.replace('https://', '').substring(0, 30)
+						: 'Default (Gemini)'}
+				</Text>
+			</Box>
+
+			{/* LLM Base URL */}
+			<Box paddingX={1}>
+				{isEditingBaseUrl && selectedIndex === 14 ? (
+					<TextInput
+						value={llmBaseUrl}
+						onChange={setLLMBaseUrl}
+						onSubmit={value => {
+							const trimmed = value.trim();
+							setLLMBaseUrl(trimmed);
+							config.setLLMConfig({...config.getLLMConfig(), baseUrl: trimmed});
+							setIsEditingBaseUrl(false);
+						}}
+						placeholder="Enter base URL (e.g., https://api.kilogateway.com/v1)"
+						focus
+					/>
+				) : (
+					<Text
+						backgroundColor={
+							selectedIndex === 14 ? theme.colors.primary : undefined
+						}
+						color={
+							selectedIndex === 14 ? theme.colors.background : theme.colors.text
+						}
+						bold={selectedIndex === 14}
+					>
+						Base URL:{' '}
+						{llmBaseUrl
+							? llmBaseUrl.replace('https://', '').substring(0, 30)
+							: '(not set)'}
+					</Text>
+				)}
+			</Box>
+
+			{/* Downloads Enabled */}
+			<Box paddingX={1}>
+				<Text
+					backgroundColor={
+						selectedIndex === 15 ? theme.colors.primary : undefined
+					}
+					color={
+						selectedIndex === 15 ? theme.colors.background : theme.colors.text
+					}
+					bold={selectedIndex === 15}
+				>
 					Download Feature: {downloadsEnabled ? 'ON' : 'OFF'}
 				</Text>
 			</Box>
 
 			{/* Download Folder */}
 			<Box paddingX={1}>
-				{isEditingDownloadDirectory && selectedIndex === 13 ? (
+				{isEditingDownloadDirectory && selectedIndex === 16 ? (
 					<TextInput
 						value={downloadDirectory}
 						onChange={setDownloadDirectory}
@@ -559,12 +640,12 @@ export default function Settings() {
 				) : (
 					<Text
 						backgroundColor={
-							selectedIndex === 13 ? theme.colors.primary : undefined
+							selectedIndex === 16 ? theme.colors.primary : undefined
 						}
 						color={
-							selectedIndex === 13 ? theme.colors.background : theme.colors.text
+							selectedIndex === 16 ? theme.colors.background : theme.colors.text
 						}
-						bold={selectedIndex === 13}
+						bold={selectedIndex === 16}
 					>
 						Download Folder: {downloadDirectory}
 					</Text>
@@ -575,12 +656,12 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 14 ? theme.colors.primary : undefined
+						selectedIndex === 17 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 14 ? theme.colors.background : theme.colors.text
+						selectedIndex === 17 ? theme.colors.background : theme.colors.text
 					}
-					bold={selectedIndex === 14}
+					bold={selectedIndex === 17}
 				>
 					Download Format: {downloadFormat.toUpperCase()}
 				</Text>
@@ -590,16 +671,16 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 15 ? theme.colors.primary : undefined
+						selectedIndex === 18 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 15
+						selectedIndex === 18
 							? theme.colors.background
 							: isActive
 								? theme.colors.accent
 								: theme.colors.text
 					}
-					bold={selectedIndex === 15}
+					bold={selectedIndex === 18}
 				>
 					{sleepTimerLabel}
 				</Text>
@@ -609,12 +690,12 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 16 ? theme.colors.primary : undefined
+						selectedIndex === 19 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 16 ? theme.colors.background : theme.colors.text
+						selectedIndex === 19 ? theme.colors.background : theme.colors.text
 					}
-					bold={selectedIndex === 16}
+					bold={selectedIndex === 19}
 				>
 					Import Playlists →
 				</Text>
@@ -624,12 +705,12 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 17 ? theme.colors.primary : undefined
+						selectedIndex === 20 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 17 ? theme.colors.background : theme.colors.text
+						selectedIndex === 20 ? theme.colors.background : theme.colors.text
 					}
-					bold={selectedIndex === 17}
+					bold={selectedIndex === 20}
 				>
 					Export Playlists →
 				</Text>
@@ -639,12 +720,12 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 18 ? theme.colors.primary : undefined
+						selectedIndex === 21 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 18 ? theme.colors.background : theme.colors.text
+						selectedIndex === 21 ? theme.colors.background : theme.colors.text
 					}
-					bold={selectedIndex === 18}
+					bold={selectedIndex === 21}
 				>
 					Custom Keybindings →
 				</Text>
@@ -654,12 +735,12 @@ export default function Settings() {
 			<Box paddingX={1}>
 				<Text
 					backgroundColor={
-						selectedIndex === 19 ? theme.colors.primary : undefined
+						selectedIndex === 22 ? theme.colors.primary : undefined
 					}
 					color={
-						selectedIndex === 19 ? theme.colors.background : theme.colors.text
+						selectedIndex === 22 ? theme.colors.background : theme.colors.text
 					}
-					bold={selectedIndex === 19}
+					bold={selectedIndex === 22}
 				>
 					Manage Plugins
 				</Text>
