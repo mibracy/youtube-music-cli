@@ -28,30 +28,69 @@ export class DiscordRpcService {
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
 			const rpc = await import('discord-rpc');
-			const client = new rpc.Client({transport: 'ipc'});
 
-			await new Promise<void>((resolve, reject) => {
-				const timeout = setTimeout(() => {
-					reject(new Error('Discord RPC connection timeout'));
-				}, 5000);
+			// Try multiple pipe names to support different Discord clients
+			const pipeNames = [
+				'discord',
+				'discord-canary',
+				'discordptb',
+				'discord-development',
+			];
+			let lastError: Error | null = null;
 
-				client.on('ready', () => {
-					clearTimeout(timeout);
-					this.connected = true;
-					logger.info('DiscordRpcService', 'Connected to Discord');
-					resolve();
-				});
+			for (const pipeName of pipeNames) {
+				try {
+					const client = new rpc.Client({
+						transport: 'ipc',
+						pipe: pipeName,
+					});
 
-				client
-					.login({clientId: '1473580336964177960'}) // Public client ID for music players
-					.catch(reject);
-			});
+					await new Promise<void>((resolve, reject) => {
+						const timeout = setTimeout(() => {
+							client.destroy();
+							reject(new Error(`Connection timeout for pipe ${pipeName}`));
+						}, 10000);
 
-			this.client = client;
+						client.on('ready', () => {
+							clearTimeout(timeout);
+							this.connected = true;
+							logger.info(
+								'DiscordRpcService',
+								`Connected to Discord via pipe: ${pipeName}`,
+							);
+							resolve();
+						});
+
+						client.on('error', () => {
+							// Continue to next pipe on error
+						});
+
+						client
+							.login({clientId: '1473580336964177960'})
+							.catch((err: unknown) => {
+								client.destroy();
+								reject(err);
+							});
+					});
+
+					this.client = client;
+					return; // Success
+				} catch (err) {
+					lastError = err as Error;
+					// Try next pipe name
+					continue;
+				}
+			}
+
+			// If we got here, all pipes failed
+			throw new Error(
+				`Failed to connect to Discord RPC. Tried pipes: ${pipeNames.join(', ')}. Last error: ${lastError?.message}`,
+			);
 		} catch (error) {
 			logger.warn('DiscordRpcService', 'Could not connect to Discord', {
 				error: error instanceof Error ? error.message : String(error),
 			});
+			throw error; // Re-throw so plugin knows connect failed
 		}
 	}
 

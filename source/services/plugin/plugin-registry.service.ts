@@ -172,11 +172,21 @@ class PluginRegistryService {
 
 		// Call enable hook
 		if (instance.plugin.enable) {
-			await this.pluginLoader.callHook(
-				instance.plugin,
-				'enable',
-				instance.context,
-			);
+			try {
+				await this.pluginLoader.callHook(
+					instance.plugin,
+					'enable',
+					instance.context,
+				);
+			} catch (error) {
+				logger.error(
+					'PluginRegistryService',
+					`Error in enable hook for ${pluginId}:`,
+					error,
+				);
+				// Don't re-throw - plugin remains disabled but app continues
+				return;
+			}
 		}
 
 		instance.enabled = true;
@@ -205,11 +215,20 @@ class PluginRegistryService {
 
 		// Call disable hook
 		if (instance.plugin.disable) {
-			await this.pluginLoader.callHook(
-				instance.plugin,
-				'disable',
-				instance.context,
-			);
+			try {
+				await this.pluginLoader.callHook(
+					instance.plugin,
+					'disable',
+					instance.context,
+				);
+			} catch (error) {
+				logger.error(
+					'PluginRegistryService',
+					`Error in disable hook for ${pluginId}:`,
+					error,
+				);
+				// Continue to disable state even if disable hook fails
+			}
 		}
 
 		instance.enabled = false;

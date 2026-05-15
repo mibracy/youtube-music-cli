@@ -20,6 +20,25 @@ import {APP_VERSION} from './utils/constants.ts';
 import {ensurePlaybackDependencies} from './services/player/dependency-check.service.ts';
 import {getMusicService} from './services/youtube-music/api.ts';
 import type {Track} from './types/youtube-music.types.ts';
+import {logger} from './services/logger/logger.service.ts';
+
+// Global error handlers to prevent crashes from unhandled rejections/exceptions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+process.on('unhandledRejection', (reason: any, _promise: any) => {
+	logger.error('UnhandledRejection', 'Unhandled promise rejection', {
+		reason: reason instanceof Error ? reason.message : String(reason),
+		stack: reason instanceof Error ? reason.stack : undefined,
+	});
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+process.on('uncaughtException', (err: any) => {
+	logger.error('UncaughtException', 'Uncaught exception', {
+		error: err instanceof Error ? err.message : String(err),
+		stack: err instanceof Error ? err.stack : undefined,
+	});
+	// Don't exit; just log to keep CLI alive
+});
 
 const isStandalone =
 	(process as unknown as {isStandaloneExecutable?: boolean})
@@ -283,7 +302,8 @@ if (command === 'plugins') {
 				}
 
 				console.log(`Installing ${pluginArg}...`);
-				let result;
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				let result: any;
 				if (pluginArg.startsWith('http')) {
 					result = await installer.installFromGitHub(pluginArg);
 				} else {

@@ -276,7 +276,7 @@ export function PluginsProvider({children}: {children: ReactNode}) {
 		const loadPlugins = async () => {
 			await registryService.loadAllPlugins();
 
-			// Restore previously enabled plugins
+			// Restore previously enabled plugins (with error handling)
 			const config = getConfigService();
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const pluginStates = config.get('pluginStates' as any) as
@@ -284,7 +284,18 @@ export function PluginsProvider({children}: {children: ReactNode}) {
 				| undefined;
 			for (const plugin of registryService.getAllPlugins()) {
 				if (pluginStates?.[plugin.manifest.id]?.enabled && !plugin.enabled) {
-					await registryService.enablePlugin(plugin.manifest.id);
+					try {
+						await registryService.enablePlugin(plugin.manifest.id);
+					} catch (error) {
+						logger.warn(
+							'PluginsProvider',
+							`Failed to auto-enable plugin ${plugin.manifest.id}`,
+							{
+								error: error instanceof Error ? error.message : String(error),
+							},
+						);
+						// Continue with other plugins
+					}
 				}
 			}
 
