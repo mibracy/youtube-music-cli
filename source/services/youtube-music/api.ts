@@ -595,12 +595,44 @@ class MusicService {
 	}
 
 	async getAlbum(albumId: string): Promise<Album> {
-		return {
-			albumId,
-			name: 'Unknown Album',
-			artists: [],
-			tracks: [],
-		} as unknown as Album;
+		try {
+			const yt = await getClient();
+			const albumData = await yt.music.getAlbum(albumId);
+			logger.debug('MusicService', 'getAlbum data', {albumData});
+			const tracks: Track[] = (albumData.contents || []).map((item: any) => ({
+				videoId: item.video_id || item.id,
+				title: item.title || 'Unknown Title',
+				artists: (item.artists || []).map((a: any) => ({
+					artistId: a.channel_id,
+					name: a.name,
+				})),
+				duration:
+					typeof item.duration === 'number'
+						? item.duration
+						: (item.duration?.seconds ?? 0),
+			}));
+
+			return {
+				albumId,
+				name: (albumData as any).title || 'Unknown Album',
+				artists: ((albumData as any).artists || []).map((a: any) => ({
+					artistId: a.channel_id,
+					name: a.name,
+				})),
+				tracks,
+			} as Album;
+		} catch (error) {
+			logger.error('MusicService', 'getAlbum failed', {
+				albumId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return {
+				albumId,
+				name: 'Unknown Album',
+				artists: [],
+				tracks: [],
+			};
+		}
 	}
 
 	async getArtist(artistId: string): Promise<Artist> {

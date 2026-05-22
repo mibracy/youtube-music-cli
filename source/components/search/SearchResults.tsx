@@ -174,6 +174,31 @@ function SearchResults({
 					error,
 				});
 			}
+		} else if (selected && selected.type === 'album') {
+			const albumData = selected.data as {
+				albumId: string;
+				name: string;
+			};
+			const albumId = albumData.albumId;
+
+			try {
+				const fullAlbum = await musicService.getAlbum(albumId);
+				if (fullAlbum.tracks.length === 0) {
+					logger.warn('SearchResults', 'Album has no tracks', {
+						albumId,
+					});
+					return;
+				}
+
+				// Replace queue with album tracks and start playback
+				playerDispatch({category: 'CLEAR_QUEUE'});
+				playerDispatch({category: 'SET_QUEUE', queue: fullAlbum.tracks});
+				playerDispatch({category: 'PLAY', track: fullAlbum.tracks[0]!});
+			} catch (error) {
+				logger.error('SearchResults', 'Failed to play album', {
+					error,
+				});
+			}
 		} else {
 			logger.warn('SearchResults', 'Selected item is not playable', {
 				type: selected?.type,
