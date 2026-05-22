@@ -8,7 +8,7 @@ import {FavoritesProvider} from './stores/favorites.store.tsx';
 import {HistoryProvider} from './stores/history.store.tsx';
 import {StatsProvider} from './stores/stats.store.tsx';
 import {ErrorBoundary} from './components/common/ErrorBoundary.tsx';
-import {KeyboardManager} from './hooks/useKeyboard.ts';
+import {KeyboardManager} from './hooks/useKeyboard.tsx';
 import {KeyboardBlockProvider} from './hooks/useKeyboardBlocker.tsx';
 import {Box, Text} from 'ink';
 import type {Flags} from './types/cli.types.ts';
@@ -22,9 +22,10 @@ import {getNotificationService} from './services/notification/notification.servi
 import {loadPlayerState} from './services/player-state/player-state.service.ts';
 import type {Track} from './types/youtube-music.types.ts';
 
-import {useKeyBinding} from './hooks/useKeyboard.ts';
+import {useKeyBinding} from './hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from './utils/constants.ts';
 import {ChatProvider} from './stores/chat.store.tsx';
+import {showNavError} from './utils/error.ts';
 
 function Initializer({flags}: {flags?: Flags}) {
 	const {dispatch} = useNavigation();
@@ -220,6 +221,29 @@ function HeadlessLayout({flags}: {flags?: Flags}) {
 }
 
 export default function Main({flags}: {flags?: Flags}) {
+	useEffect(() => {
+		const handler = (reason: unknown) => {
+			const msg = (reason as Error)?.message ?? String(reason ?? 'Unknown error');
+			showNavError(msg);
+		};
+		process.on('unhandledRejection', handler);
+		return () => {process.off('unhandledRejection', handler);};
+	}, []);
+
+	useEffect(() => {
+		const restore = () => {process.stdout.write('\x1b[?1049l');};
+		const onSigint = () => process.exit(0);
+		const onSigterm = () => process.exit(0);
+		process.on('exit', restore);
+		process.on('SIGINT', onSigint);
+		process.on('SIGTERM', onSigterm);
+		return () => {
+			process.off('exit', restore);
+			process.off('SIGINT', onSigint);
+			process.off('SIGTERM', onSigterm);
+		};
+	}, []);
+
 	return (
 		<ErrorBoundary>
 			<ThemeProvider>
@@ -231,17 +255,17 @@ export default function Main({flags}: {flags?: Flags}) {
 									<ChatProvider>
 										<PluginsProvider>
 											<KeyboardBlockProvider>
-												<Box flexDirection="column">
-													<KeyboardManager />
-													{flags?.headless ? (
-														<HeadlessLayout flags={flags} />
-													) : (
-														<>
-															<Initializer flags={flags} />
-															<MainLayout />
-														</>
-													)}
-												</Box>
+											<Box flexDirection="column" height="100%">
+												{flags?.headless ? (
+													<HeadlessLayout flags={flags} />
+												) : (
+													<>
+														<Initializer flags={flags} />
+														<MainLayout />
+													</>
+												)}
+												<KeyboardManager />
+											</Box>
 											</KeyboardBlockProvider>
 										</PluginsProvider>
 									</ChatProvider>

@@ -575,6 +575,7 @@ if (command === 'plugins') {
 					});
 				} else {
 					// Also render the CLI UI
+					process.stdout.write('\x1b[?1049h');
 					render(<App flags={flags} />);
 				}
 			} catch (error) {
@@ -618,6 +619,7 @@ if (command === 'plugins') {
 			}
 
 			// Render the app
+			process.stdout.write('\x1b[?1049h');
 			render(<App flags={flags} />);
 		})();
 	}

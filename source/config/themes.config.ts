@@ -7,6 +7,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'cyan',
 			secondary: 'blue',
+			highlight: 'blue',
 			background: 'black',
 			text: 'white',
 			accent: 'yellow',
@@ -22,6 +23,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'blue',
 			secondary: 'cyan',
+			highlight: 'gray',
 			background: 'white',
 			text: 'black',
 			accent: 'magenta',
@@ -37,6 +39,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'magenta',
 			secondary: 'purple',
+			highlight: 'purple',
 			background: 'black',
 			text: 'white',
 			accent: 'cyan',
@@ -52,6 +55,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'green',
 			secondary: 'greenBright',
+			highlight: 'green',
 			background: 'black',
 			text: 'white',
 			accent: 'greenBright',
@@ -67,6 +71,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'magenta',
 			secondary: 'cyan',
+			highlight: 'magenta',
 			background: 'black',
 			text: 'white',
 			accent: 'yellow',
@@ -82,6 +87,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'blue',
 			secondary: 'cyan',
+			highlight: 'blue',
 			background: 'black',
 			text: 'white',
 			accent: 'blueBright',
@@ -97,6 +103,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'cyan',
 			secondary: 'blue',
+			highlight: 'blue',
 			background: 'black',
 			text: 'white',
 			accent: 'yellow',
@@ -112,6 +119,7 @@ export const BUILTIN_THEMES: Record<string, Theme> = {
 		colors: {
 			primary: 'magenta',
 			secondary: 'blue',
+			highlight: 'blue',
 			background: 'black',
 			text: 'white',
 			accent: 'cyan',

@@ -5,7 +5,7 @@ import {useState} from 'react';
 import type {ReactNode} from 'react';
 import {useChat} from '../../stores/chat.store.tsx';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {VIEW, KEYBINDINGS} from '../../utils/constants.ts';
 
 export default function AIChatView(): ReactNode {
@@ -28,7 +28,7 @@ export default function AIChatView(): ReactNode {
 
 	if (!isConfigured) {
 		return (
-			<Box flexDirection="column" padding={1} height={20}>
+			<Box flexDirection="column" flexGrow={1} padding={1}>
 				<Box
 					flexDirection="column"
 					borderStyle="round"
@@ -53,7 +53,7 @@ export default function AIChatView(): ReactNode {
 	}
 
 	return (
-		<Box flexDirection="column" padding={1} height={20}>
+		<Box flexDirection="column" padding={1} >
 			<Box
 				flexDirection="column"
 				borderStyle="round"

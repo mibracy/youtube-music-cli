@@ -81,8 +81,8 @@ export default function PluginsAvailable({
 				return (
 					<Box key={plugin.id} paddingX={1}>
 						<Text
-							backgroundColor={isSelected ? theme.colors.primary : undefined}
-							color={isSelected ? theme.colors.background : theme.colors.text}
+							backgroundColor={isSelected ? theme.colors.highlight : undefined}
+							color={theme.colors.text}
 							bold={isSelected}
 						>
 							{plugin.name}

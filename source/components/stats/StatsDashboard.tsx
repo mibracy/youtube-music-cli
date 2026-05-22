@@ -1,7 +1,7 @@
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useStats} from '../../stores/stats.store.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import StatsOverview from './StatsOverview.tsx';

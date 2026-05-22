@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import {useYouTubeMusic} from '../../hooks/useYouTubeMusic.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import type {Track} from '../../types/youtube-music.types.ts';
 import {truncate} from '../../utils/format.ts';
@@ -63,8 +63,8 @@ export default function Suggestions() {
 				return (
 					<Box key={track.videoId} paddingX={1}>
 						<Text
-							backgroundColor={isSelected ? theme.colors.primary : undefined}
-							color={isSelected ? theme.colors.background : theme.colors.text}
+							backgroundColor={isSelected ? theme.colors.highlight : undefined}
+							color={theme.colors.text}
 							bold={isSelected}
 						>
 							{index + 1}. {truncate(track.title, 40)} -{' '}

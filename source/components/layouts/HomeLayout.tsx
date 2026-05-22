@@ -7,7 +7,7 @@ import {useHistory} from '../../stores/history.store.tsx';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {VIEW, KEYBINDINGS} from '../../utils/constants.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {truncate, formatTime} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {ICONS} from '../../utils/icons.ts';
@@ -20,7 +20,7 @@ export default function HomeLayout() {
 	const {history} = useHistory();
 	const {favorites, toggleFavorite} = useFavorites();
 	const {state: playerState, play} = usePlayer();
-	const {columns} = useTerminalSize();
+	const {columns, rows} = useTerminalSize();
 
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -78,14 +78,15 @@ export default function HomeLayout() {
 		{label: '📜 Playlists', view: VIEW.PLAYLISTS},
 		{label: '🔥 Trending', view: VIEW.TRENDING},
 		{label: '🆕 New Releases', view: VIEW.NEW_RELEASES},
-		{label: '❤️ Favorites', view: VIEW.FAVORITES},
+		{label: '💘 Favorites', view: VIEW.FAVORITES},
 		{label: '🕒 History', view: VIEW.HISTORY},
 		{label: '🎲 Play Random Song', action: handlePlayRandom},
 		{label: '🎵 Play Random Favorite', action: handlePlayRandomFavorite},
 	];
 
-	const recentHistory = history.slice(0, 5);
-	const recentFavorites = favorites.slice(0, 5);
+	const itemsPerSection = Math.max(1, Math.min(5, Math.floor((rows - 14) / 2)));
+	const recentHistory = history.slice(0, itemsPerSection);
+	const recentFavorites = favorites.slice(0, itemsPerSection);
 
 	const totalItems =
 		quickLinks.length + recentHistory.length + recentFavorites.length;
@@ -146,7 +147,7 @@ export default function HomeLayout() {
 		playerState.currentTrack?.artists?.map(a => a.name).join(', ') ?? '';
 
 	return (
-		<Box flexDirection="column" paddingX={1} paddingY={0}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} paddingY={0}>
 			{/* Header */}
 			<Box
 				borderStyle="double"
@@ -159,7 +160,7 @@ export default function HomeLayout() {
 				</Text>
 			</Box>
 
-			<Box flexDirection="row" gap={1}>
+			<Box flexDirection="row" flexGrow={1} minHeight={0} gap={1}>
 				{/* Left Column: Quick Links */}
 				<Box
 					flexDirection="column"
@@ -193,10 +194,11 @@ export default function HomeLayout() {
 				</Box>
 
 				{/* Right Column: Activity */}
-				<Box flexDirection="column" flexGrow={1}>
+				<Box flexDirection="column" flexGrow={1} minHeight={0}>
 					{/* Recently Played */}
 					<Box
 						flexDirection="column"
+						flexGrow={1}
 						borderStyle="round"
 						borderColor={theme.colors.dim}
 						paddingX={1}
@@ -211,64 +213,64 @@ export default function HomeLayout() {
 								const actualIndex = index + quickLinks.length;
 								return (
 									<Box key={`${entry.playedAt}-${entry.track.videoId}`}>
-										<Text
-											backgroundColor={
-												selectedIndex === actualIndex
-													? theme.colors.primary
-													: undefined
-											}
-											color={
-												selectedIndex === actualIndex
-													? theme.colors.background
-													: theme.colors.text
-											}
-										>
-											{selectedIndex === actualIndex ? '> ' : '  '}
-											{truncate(entry.track.title, maxTitleLength)}
-										</Text>
-										<Text color={theme.colors.dim} wrap="truncate">
-											{' '}
-											- {entry.track.artists[0]?.name}
-										</Text>
-									</Box>
-								);
-							})
-						)}
-					</Box>
+								<Text
+									backgroundColor={
+										selectedIndex === actualIndex
+											? theme.colors.primary
+											: undefined
+									}
+									color={
+										selectedIndex === actualIndex
+											? theme.colors.background
+											: theme.colors.text
+									}
+								>
+									{selectedIndex === actualIndex ? '> ' : '  '}
+									{truncate(entry.track.title, maxTitleLength)}
+								</Text>
+								<Text color={theme.colors.dim} wrap="truncate">
+									{' '}
+									- {entry.track.artists[0]?.name}
+								</Text>
+							</Box>
+						);
+					})
+				)}
+			</Box>
 
-					{/* Top Favorites */}
-					<Box
-						flexDirection="column"
-						borderStyle="round"
-						borderColor={theme.colors.dim}
-						paddingX={1}
-					>
-						<Text bold color={theme.colors.secondary}>
-							{ICONS.HEART} Recent Favorites
-						</Text>
-						{recentFavorites.length === 0 ? (
-							<Text color={theme.colors.dim}>
-								{' '}
-								No favorites yet (press 'f' while playing)
-							</Text>
-						) : (
-							recentFavorites.map((track, index) => {
-								const actualIndex =
-									index + quickLinks.length + recentHistory.length;
-								return (
-									<Box key={track.videoId}>
-										<Text
-											backgroundColor={
-												selectedIndex === actualIndex
-													? theme.colors.primary
-													: undefined
-											}
-											color={
-												selectedIndex === actualIndex
-													? theme.colors.background
-													: theme.colors.text
-											}
-										>
+			{/* Top Favorites */}
+			<Box
+				flexDirection="column"
+				borderStyle="round"
+				borderColor={theme.colors.dim}
+				paddingX={1}
+			>
+				<Text bold color={theme.colors.secondary}>
+					{ICONS.HEART} Recent Favorites
+				</Text>
+				{recentFavorites.length === 0 ? (
+					<Text color={theme.colors.dim}>
+						{' '}
+						No favorites yet (press 'f' while playing)
+					</Text>
+				) : (
+					recentFavorites.map((track, index) => {
+						const actualIndex =
+							index + quickLinks.length + recentHistory.length;
+						return (
+							<Box key={track.videoId}>
+								<Text
+									backgroundColor={
+										selectedIndex === actualIndex
+											? theme.colors.primary
+											: undefined
+									}
+									color={
+										selectedIndex === actualIndex
+											? theme.colors.background
+											: theme.colors.text
+									}
+								>
 											{selectedIndex === actualIndex ? '> ' : '  '}
 											{truncate(track.title, maxTitleLength)}
 										</Text>
@@ -333,7 +335,7 @@ export default function HomeLayout() {
 			>
 				<Box>
 					<Text color={theme.colors.dim}>
-						Navigate: Arrows • Select: Enter • Search: / • Quit: q
+						Navigate: Arrows • Select: Enter • Search: / • Quit :q
 					</Text>
 				</Box>
 				<Box>

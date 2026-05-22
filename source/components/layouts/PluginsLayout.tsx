@@ -3,7 +3,7 @@ import {useState, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlugins} from '../../stores/plugins.store.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import PluginsList from '../plugins/PluginsList.tsx';
 import PluginInstallDialog from '../plugins/PluginInstallDialog.tsx';

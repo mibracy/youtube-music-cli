@@ -1,0 +1,126 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup",
+      "type": "shell",
+      "command": "bun install",
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "rm -rf dist",
+      "group": "clean",
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "bun build source/cli.tsx --outfile dist/source/cli.js --target bun --footer \"//Copyright (c) 2026 involvex\" --production",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Launch",
+      "type": "shell",
+      "command": "bun run dist/source/cli.js",
+      "dependsOn": ["Build"],
+      "dependsOrder": "sequence",
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev",
+      "type": "shell",
+      "command": "bun run --bun source/cli.tsx",
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev (watch)",
+      "type": "shell",
+      "command": "bun run --bun --watch source/cli.tsx",
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test",
+      "type": "shell",
+      "command": "bun build source/cli.tsx --outfile dist/source/cli.js --target bun --footer \"//Copyright (c) 2026 involvex\" --production && npx ava",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "options": {
+        "env": {
+          "PATH": "${env:PATH}:${env:HOME}/.bun/bin"
+        }
+      },
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Format",
+      "type": "shell",
+      "command": "npx prettier --write .",
+      "presentation": {
+        "clear": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

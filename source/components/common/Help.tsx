@@ -2,7 +2,7 @@
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useCallback} from 'react';
 

@@ -1,5 +1,5 @@
 // Player controls component
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {getConfigService} from '../../services/config/config.service.ts';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
@@ -220,7 +220,7 @@ export default function PlayerControls() {
 			{playerState.radioIsActive && (
 				<Box paddingX={2}>
 					<Text color={theme.colors.primary} bold>
-						📡 Radio Mode
+						{ICONS.RADIO} Radio Mode
 					</Text>
 					{playerState.radioSeed && (
 						<Text color={theme.colors.dim}>
@@ -228,7 +228,7 @@ export default function PlayerControls() {
 							— {playerState.radioSeed.type}: {playerState.radioSeed.name}
 						</Text>
 					)}
-					<Text color={theme.colors.dim}> (Shift+X to toggle)</Text>
+					<Text color={theme.colors.dim}> (Sft+X to toggle)</Text>
 				</Box>
 			)}
 

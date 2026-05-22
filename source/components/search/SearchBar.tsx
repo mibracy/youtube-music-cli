@@ -4,7 +4,7 @@ import {useState, useCallback} from 'react';
 import React from 'react';
 import {SEARCH_TYPE} from '../../utils/constants.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
 import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';

@@ -47,6 +47,23 @@ export function formatError(error: unknown): string {
 	return String(error);
 }
 
+export function showNavError(msg: string): void {
+	navErrorListeners.forEach(fn => fn(msg));
+	if (navErrorTimeout) clearTimeout(navErrorTimeout);
+	navErrorTimeout = setTimeout(() => {
+		navErrorListeners.forEach(fn => fn(null));
+		navErrorTimeout = null;
+	}, 4000);
+}
+
+let navErrorTimeout: ReturnType<typeof setTimeout> | null = null;
+const navErrorListeners = new Set<(msg: string | null) => void>();
+
+export function subscribeToNavError(fn: (msg: string | null) => void): () => void {
+	navErrorListeners.add(fn);
+	return () => {navErrorListeners.delete(fn);};
+}
+
 export function formatErrorData(error: unknown): Record<string, unknown> {
 	if (error === null || error === undefined) {
 		return {error: 'Unknown error'};

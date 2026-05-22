@@ -1,6 +1,6 @@
 // Keyboard input handling hook
-import {useEffect, useRef} from 'react';
-import {useInput} from 'ink';
+import {useEffect, useRef, useState} from 'react';
+import {Box, Text, useInput} from 'ink';
 import {logger} from '../services/logger/logger.service.ts';
 import {useKeyboardBlockContext} from './useKeyboardBlocker.tsx';
 
@@ -82,6 +82,9 @@ export function useKeyBinding(
  */
 export function KeyboardManager() {
 	const {blockCount} = useKeyboardBlockContext();
+	const [commandBuffer, setCommandBuffer] = useState('');
+	const [isCommandMode, setIsCommandMode] = useState(false);
+	const commandRef = useRef('');
 
 	useEffect(() => {
 		// Explicitly disable various terminal mouse reporting modes to prevent
@@ -117,6 +120,55 @@ export function KeyboardManager() {
 
 		// Ignore multi-character input that isn't recognized (likely mouse chunks or paste).
 		if (input.length > 1 && !isKnownSpecialKey) {
+			return;
+		}
+
+		// Vim-style command mode (:q)
+		if (isCommandMode) {
+			if (key.escape) {
+				setIsCommandMode(false);
+				commandRef.current = '';
+				setCommandBuffer('');
+				return;
+			}
+
+			if (key.backspace) {
+				if (commandRef.current.length <= 1) {
+					setIsCommandMode(false);
+					commandRef.current = '';
+					setCommandBuffer('');
+				} else {
+					commandRef.current = commandRef.current.slice(0, -1);
+					setCommandBuffer(commandRef.current);
+				}
+				return;
+			}
+
+			if (key.return) {
+				const cmd = commandRef.current.slice(1).trim().toLowerCase();
+				if (cmd === 'q' || cmd === 'q!') {
+					process.exit(0);
+				}
+
+				setIsCommandMode(false);
+				commandRef.current = '';
+				setCommandBuffer('');
+				return;
+			}
+
+			if (input.length === 1 && !key.ctrl && !key.meta) {
+				commandRef.current += input;
+				setCommandBuffer(commandRef.current);
+				return;
+			}
+
+			return;
+		}
+
+		if (input === ':' && !key.ctrl && !key.meta) {
+			setIsCommandMode(true);
+			commandRef.current = ':';
+			setCommandBuffer(':');
 			return;
 		}
 
@@ -344,5 +396,13 @@ export function KeyboardManager() {
 		}
 	});
 
-	return null;
+	return (
+		<>
+			{isCommandMode && (
+				<Box>
+					<Text inverse>{commandBuffer}</Text>
+				</Box>
+			)}
+		</>
+	);
 }

@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {getConfigService} from '../../services/config/config.service.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 
 type Props = {
@@ -58,13 +58,9 @@ export default function SearchHistory({onSelect}: Props) {
 					<Box key={index} paddingX={1}>
 						<Text
 							backgroundColor={
-								selectedIndex === index ? theme.colors.primary : undefined
+								selectedIndex === index ? theme.colors.highlight : undefined
 							}
-							color={
-								selectedIndex === index
-									? theme.colors.background
-									: theme.colors.text
-							}
+							color={theme.colors.text}
 						>
 							{query}
 						</Text>

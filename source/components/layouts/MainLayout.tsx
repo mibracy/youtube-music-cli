@@ -9,7 +9,7 @@ import {
 	useKeyBinding,
 	registerGoHomeCallback,
 	setCurrentViewForCtrlC,
-} from '../../hooks/useKeyboard.ts';
+} from '../../hooks/useKeyboard.tsx';
 import SearchLayout from './SearchLayout.tsx';
 import PlayerLayout from './PlayerLayout.tsx';
 import MiniPlayerLayout from './MiniPlayerLayout.tsx';
@@ -298,11 +298,15 @@ function MainLayout() {
 	return (
 		<Box
 			flexDirection="column"
+			flexGrow={1}
+			minHeight={0}
 			paddingX={getPadding()}
 			borderStyle="single"
 			borderColor={theme.colors.primary}
 		>
-			{currentView}
+			<Box flexGrow={1} minHeight={0}>
+				{currentView}
+			</Box>
 
 			{/* Shortcuts bar at bottom - shows context-relevant shortcuts */}
 			<ShortcutsBar />

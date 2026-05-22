@@ -10,7 +10,7 @@ import type {
 } from '../../types/youtube-music.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import SearchBar from '../search/SearchBar.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';

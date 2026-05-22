@@ -3,7 +3,7 @@ import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useCallback, useState} from 'react';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {usePlaylist} from '../../hooks/usePlaylist.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
@@ -170,7 +170,7 @@ export default function PlaylistList() {
 					const isSelected = index === selectedIndex;
 					const isRenaming =
 						renamingPlaylistId === playlist.playlistId && isSelected;
-					const rowBackground = isSelected ? theme.colors.secondary : undefined;
+					const rowBackground = isSelected ? theme.colors.highlight : undefined;
 
 					return (
 						<Box
@@ -180,7 +180,7 @@ export default function PlaylistList() {
 						>
 							<Text
 								color={
-									isSelected ? theme.colors.background : theme.colors.primary
+									isSelected ? theme.colors.text : theme.colors.primary
 								}
 								bold={isSelected}
 							>
@@ -198,9 +198,7 @@ export default function PlaylistList() {
 									/>
 								) : (
 									<Text
-										color={
-											isSelected ? theme.colors.background : theme.colors.text
-										}
+										color={theme.colors.text}
 										bold={isSelected}
 									>
 										{playlist.name}

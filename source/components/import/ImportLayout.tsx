@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {getImportService} from '../../services/import/import.service.ts';
 import type {ImportSource, ImportProgress} from '../../types/import.types.ts';
@@ -161,13 +161,9 @@ export default function ImportLayout() {
 						<Box key={source.key} paddingX={1}>
 							<Text
 								backgroundColor={
-									index === selectedSource ? theme.colors.primary : undefined
+									index === selectedSource ? theme.colors.highlight : undefined
 								}
-								color={
-									index === selectedSource
-										? theme.colors.background
-										: theme.colors.text
-								}
+								color={theme.colors.text}
 								bold={index === selectedSource}
 							>
 								{index === selectedSource ? '► ' : '  '}

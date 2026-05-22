@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import type {SearchResult, Track} from '../../types/youtube-music.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlaylist} from '../../hooks/usePlaylist.ts';
@@ -379,24 +379,24 @@ function SearchResults({
 					<Box
 						key={index}
 						paddingX={1}
-						backgroundColor={isSelected ? theme.colors.secondary : undefined}
+						backgroundColor={isSelected ? theme.colors.highlight : undefined}
 					>
 						<Text
-							color={isSelected ? theme.colors.primary : theme.colors.dim}
+							color={isSelected ? theme.colors.text : theme.colors.dim}
 							bold={isSelected}
 						>
 							{(isSelected ? '> ' : '  ') + (index + 1).toString().padEnd(4)}
 						</Text>
 
 						<Text
-							color={isSelected ? theme.colors.primary : typeColor}
+							color={isSelected ? theme.colors.text : typeColor}
 							bold={isSelected}
 						>
 							{result.type.toUpperCase().padEnd(10)}
 						</Text>
 
 						<Text
-							color={isSelected ? theme.colors.primary : theme.colors.text}
+							color={isSelected ? theme.colors.text : theme.colors.text}
 							bold={isSelected}
 						>
 							{isFav ? `${ICONS.HEART} ` : ''}
@@ -408,7 +408,7 @@ function SearchResults({
 								{trackInfo.artistName && (
 									<Text
 										color={
-											isSelected ? theme.colors.primary : theme.colors.accent
+											isSelected ? theme.colors.text : theme.colors.accent
 										}
 										bold={isSelected}
 									>
@@ -419,7 +419,7 @@ function SearchResults({
 
 								{trackInfo.albumName && (
 									<Text
-										color={isSelected ? theme.colors.primary : theme.colors.dim}
+										color={isSelected ? theme.colors.text : theme.colors.dim}
 									>
 										{' '}
 										{truncate(trackInfo.albumName, 16)}
@@ -429,7 +429,7 @@ function SearchResults({
 								{trackInfo.duration > 0 && (
 									<Text
 										color={
-											isSelected ? theme.colors.primary : theme.colors.secondary
+											isSelected ? theme.colors.text : theme.colors.secondary
 										}
 										bold={isSelected}
 									>
