@@ -39,6 +39,12 @@ type MusicSearchLike = {
 	albums?: {contents?: unknown[]};
 	artists?: {contents?: unknown[]};
 	playlists?: {contents?: unknown[]};
+	contents?: unknown[];
+};
+
+type MusicSearchSection = {
+	title?: {toString: () => string};
+	contents?: unknown[];
 };
 
 function toMusicSearchType(
@@ -65,6 +71,27 @@ function toMusicSearchType(
 			return 'all';
 		}
 	}
+}
+
+function findShelfByTitle(contents: unknown[], titleKeywords: string[]): {contents?: unknown[]} | undefined {
+	for (const item of contents) {
+		if (!item || typeof item !== 'object') {
+			continue;
+		}
+
+		const section = item as MusicSearchSection;
+		if (!section.title || typeof section.title.toString !== 'function') {
+			continue;
+		}
+
+		const sectionTitle = section.title.toString().toLowerCase();
+		const matches = titleKeywords.some(keyword => sectionTitle.includes(keyword));
+		if (matches) {
+			return item as {contents?: unknown[]};
+		}
+	}
+
+	return undefined;
 }
 
 function getMusicShelfItems(shelf: unknown): MusicSearchItem[] {
@@ -166,6 +193,22 @@ async function getClient() {
 	return ytClient;
 }
 
+function getItemTitle(item: MusicSearchItem): string {
+	const title = item.title || item.name;
+	if (title) {
+		return title;
+	}
+
+	const flexColumns = (item as Record<string, unknown>).flex_columns as
+		| Array<{title?: {text?: string}}>
+		| undefined;
+	if (flexColumns?.[0]?.title?.text) {
+		return flexColumns[0].title.text;
+	}
+
+	return '';
+}
+
 class MusicService {
 	private readonly searchCache = getSearchCache();
 
@@ -214,7 +257,15 @@ class MusicService {
 			}
 
 			if (searchType === 'all' || searchType === 'playlists') {
-				for (const playlist of getMusicShelfItems(musicSearch.playlists)) {
+				const playlistItems = getMusicShelfItems(musicSearch.playlists);
+				if (playlistItems.length === 0 && musicSearch.contents) {
+					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['playlist']);
+					if (fallbackShelf) {
+						playlistItems.push(...getMusicShelfItems(fallbackShelf));
+					}
+				}
+
+				for (const playlist of playlistItems) {
 					const playlistId = playlist.id?.trim();
 					if (!playlistId) {
 						continue;
@@ -224,7 +275,7 @@ class MusicService {
 						type: 'playlist',
 						data: {
 							playlistId,
-							name: playlist.title || playlist.name || 'Unknown Playlist',
+							name: getItemTitle(playlist) || 'Unknown Playlist',
 							tracks: [],
 						},
 					});
@@ -232,7 +283,15 @@ class MusicService {
 			}
 
 			if (searchType === 'all' || searchType === 'artists') {
-				for (const artist of getMusicShelfItems(musicSearch.artists)) {
+				const artistItems = getMusicShelfItems(musicSearch.artists);
+				if (artistItems.length === 0 && musicSearch.contents) {
+					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['artist']);
+					if (fallbackShelf) {
+						artistItems.push(...getMusicShelfItems(fallbackShelf));
+					}
+				}
+
+				for (const artist of artistItems) {
 					const artistId =
 						artist.id?.trim() ||
 						artist.author?.channel_id ||
@@ -247,8 +306,7 @@ class MusicService {
 						data: {
 							artistId,
 							name:
-								artist.name ||
-								artist.title ||
+								getItemTitle(artist) ||
 								artist.author?.name ||
 								'Unknown Artist',
 						},
@@ -257,7 +315,15 @@ class MusicService {
 			}
 
 			if (searchType === 'all' || searchType === 'albums') {
-				for (const album of getMusicShelfItems(musicSearch.albums)) {
+				const albumItems = getMusicShelfItems(musicSearch.albums);
+				if (albumItems.length === 0 && musicSearch.contents) {
+					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['album']);
+					if (fallbackShelf) {
+						albumItems.push(...getMusicShelfItems(fallbackShelf));
+					}
+				}
+
+				for (const album of albumItems) {
 					const albumId = album.id?.trim();
 					if (!albumId) {
 						continue;
@@ -267,7 +333,7 @@ class MusicService {
 						type: 'album',
 						data: {
 							albumId,
-							name: album.title || album.name || 'Unknown Album',
+							name: getItemTitle(album) || 'Unknown Album',
 							artists: (album.artists ?? []).map(artist => ({
 								artistId: artist.channel_id || artist.id || '',
 								name: artist.name ?? 'Unknown',
@@ -365,6 +431,41 @@ class MusicService {
 				searchType,
 				error: error instanceof Error ? error.message : String(error),
 			});
+		}
+
+		// For 'all' search, guarantee 1 from each non-song category, fill rest with songs
+		if (searchType === 'all' && results.length > 0) {
+			const byType = {
+				songs: [] as SearchResult[],
+				playlists: [] as SearchResult[],
+				artists: [] as SearchResult[],
+				albums: [] as SearchResult[],
+			};
+
+			for (const r of results) {
+				if (r.type === 'song') byType.songs.push(r);
+				else if (r.type === 'playlist') byType.playlists.push(r);
+				else if (r.type === 'artist') byType.artists.push(r);
+				else if (r.type === 'album') byType.albums.push(r);
+			}
+
+			const balanced: SearchResult[] = [];
+			let remaining = resultLimit;
+
+			for (const cat of [byType.albums, byType.artists, byType.playlists]) {
+				if (cat.length > 0 && remaining > 0) {
+					balanced.push(cat[0]!);
+					remaining--;
+				}
+			}
+
+			const songCount = Math.min(remaining, byType.songs.length);
+			for (let i = 0; i < songCount; i++) {
+				balanced.push(byType.songs[i]!);
+			}
+
+			results.length = 0;
+			results.push(...balanced);
 		}
 
 		const response: SearchResponse = {

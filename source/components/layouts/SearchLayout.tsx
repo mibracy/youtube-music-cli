@@ -8,6 +8,7 @@ import type {
 	SearchResult,
 	SearchDurationFilter,
 } from '../../types/youtube-music.types.ts';
+import type {NavigationState} from '../../types/navigation.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import SearchBar from '../search/SearchBar.tsx';
 import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
@@ -93,12 +94,15 @@ function SearchLayout() {
 
 	// Handle search action
 	const performSearch = useCallback(
-		async (query: string) => {
+		async (
+			query: string,
+			typeOverride?: NavigationState['searchType'],
+		) => {
 			if (!query || isSearching) return;
 
 			setIsSearching(true);
 			const response = await search(query, {
-				type: navState.searchType,
+				type: typeOverride ?? navState.searchType,
 				limit: navState.searchLimit,
 			});
 
@@ -283,8 +287,8 @@ function SearchLayout() {
 
 			<SearchBar
 				isActive={!editingFilter && isTyping && !isSearching}
-				onInput={input => {
-					void performSearch(input);
+				onInput={(input, type) => {
+					void performSearch(input, type);
 				}}
 			/>
 

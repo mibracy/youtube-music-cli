@@ -6,12 +6,13 @@ import {SEARCH_TYPE} from '../../utils/constants.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
 import {subscribeToSearchTypeCycle} from '../../hooks/useKeyboard.tsx';
+import type {NavigationState} from '../../types/navigation.types.ts';
 import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {getConfigService} from '../../services/config/config.service.ts';
 
 type Props = {
-	onInput: (input: string) => void;
+	onInput: (input: string, type?: NavigationState['searchType']) => void;
 	isActive?: boolean;
 };
 
@@ -37,7 +38,7 @@ function SearchBar({onInput, isActive = true}: Props) {
 					searchType: nextType,
 				});
 				if (input) {
-					onInput(input);
+					onInput(input, nextType);
 				}
 			}
 		},
