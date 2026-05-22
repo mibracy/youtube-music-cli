@@ -74,7 +74,7 @@ export default function Help() {
 						<Text> | </Text>
 						<Text color={theme.colors.text}>Shift+S</Text> - Toggle Shuffle
 						<Text> | </Text>
-						<Text color={theme.colors.text}>r</Text> - Toggle Repeat
+						<Text color={theme.colors.text}>Shift+L</Text> - Toggle Repeat
 					</Text>
 				</Box>
 
@@ -121,6 +121,8 @@ export default function Help() {
 				<Box paddingX={2}>
 					<Text>
 						<Text color={theme.colors.text}>a</Text> - Add to Playlist
+						<Text> | </Text>
+						<Text color={theme.colors.text}>r</Text> - Rename Playlist
 						<Text> | </Text>
 						<Text color={theme.colors.text}>d</Text> - Remove from Playlist
 						<Text> | </Text>

@@ -94,10 +94,7 @@ function SearchLayout() {
 
 	// Handle search action
 	const performSearch = useCallback(
-		async (
-			query: string,
-			typeOverride?: NavigationState['searchType'],
-		) => {
+		async (query: string, typeOverride?: NavigationState['searchType']) => {
 			if (!query || isSearching) return;
 
 			setIsSearching(true);

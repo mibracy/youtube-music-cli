@@ -7,6 +7,7 @@ import {PlayerProvider} from './stores/player.store.tsx';
 import {FavoritesProvider} from './stores/favorites.store.tsx';
 import {HistoryProvider} from './stores/history.store.tsx';
 import {StatsProvider} from './stores/stats.store.tsx';
+import {PlaylistProvider} from './stores/playlist.store.tsx';
 import {ErrorBoundary} from './components/common/ErrorBoundary.tsx';
 import {KeyboardBlockProvider} from './hooks/useKeyboardBlocker.tsx';
 import {Box, Text} from 'ink';
@@ -250,24 +251,26 @@ export default function Main({flags}: {flags?: Flags}) {
 					<FavoritesProvider>
 						<HistoryProvider>
 							<StatsProvider>
-								<NavigationProvider>
-									<ChatProvider>
-										<PluginsProvider>
-											<KeyboardBlockProvider>
-												<Box flexDirection="column" height="100%">
-													{flags?.headless ? (
-														<HeadlessLayout flags={flags} />
-													) : (
-														<>
-															<Initializer flags={flags} />
-															<MainLayout />
-														</>
-													)}
-												</Box>
-											</KeyboardBlockProvider>
-										</PluginsProvider>
-									</ChatProvider>
-								</NavigationProvider>
+								<PlaylistProvider>
+									<NavigationProvider>
+										<ChatProvider>
+											<PluginsProvider>
+												<KeyboardBlockProvider>
+													<Box flexDirection="column" height="100%">
+														{flags?.headless ? (
+															<HeadlessLayout flags={flags} />
+														) : (
+															<>
+																<Initializer flags={flags} />
+																<MainLayout />
+															</>
+														)}
+													</Box>
+												</KeyboardBlockProvider>
+											</PluginsProvider>
+										</ChatProvider>
+									</NavigationProvider>
+								</PlaylistProvider>
 							</StatsProvider>
 						</HistoryProvider>
 					</FavoritesProvider>

@@ -114,7 +114,7 @@ export const KEYBINDINGS = {
 	VOLUME_FINE_UP: ['ctrl+='], // Fine-grained +1 step (Ctrl+= to avoid conflict with '+')
 	VOLUME_FINE_DOWN: ['shift+-'], // Fine-grained -1 step
 	SHUFFLE: ['shift+s'],
-	REPEAT: ['r'],
+	REPEAT: ['shift+l'],
 	AUTOPLAY_TOGGLE: ['shift+a'],
 	GAPLESS_TOGGLE: ['shift+g'],
 	CROSSFADE_CYCLE: ['shift+c'],
@@ -154,6 +154,7 @@ export const KEYBINDINGS = {
 	CREATE_MIX: ['m'],
 	DELETE_PLAYLIST: ['D'],
 	DOWNLOAD: ['shift+d'],
+	RENAME_PLAYLIST: ['r'],
 } as const;
 
 // Default volume

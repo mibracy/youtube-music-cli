@@ -170,7 +170,7 @@ export default function ShortcutsBar() {
 					<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
 					<Text color={theme.colors.dim}>
 						{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
-						[R]
+						[Sft+L]
 					</Text>{' '}
 					• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
 					<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}

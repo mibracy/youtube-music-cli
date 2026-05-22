@@ -133,12 +133,61 @@ function SearchResults({
 					error,
 				});
 			}
+		} else if (selected && selected.type === 'playlist') {
+			const playlistData = selected.data as {
+				playlistId: string;
+				name: string;
+			};
+			const playlistId = playlistData.playlistId;
+			const playlistNameFromSearch = playlistData.name;
+
+			try {
+				const fullPlaylist = await musicService.getPlaylist(playlistId);
+				if (fullPlaylist.tracks.length === 0) {
+					logger.warn('SearchResults', 'Playlist has no tracks', {
+						playlistId,
+					});
+					return;
+				}
+
+				// Use search result name if full playlist name is generic
+				const finalName =
+					fullPlaylist.name === 'Unknown Playlist'
+						? playlistNameFromSearch
+						: fullPlaylist.name;
+
+				// Add to local playlists (preserves ID to avoid duplicates)
+				createPlaylist(finalName, fullPlaylist.tracks, playlistId);
+
+				// Replace queue with playlist tracks and start playback
+				playerDispatch({category: 'CLEAR_QUEUE'});
+				playerDispatch({category: 'SET_QUEUE', queue: fullPlaylist.tracks});
+				playerDispatch({category: 'PLAY', track: fullPlaylist.tracks[0]!});
+
+				if (mixCreatedRef.current) {
+					mixCreatedRef.current(
+						`Added "${finalName}" to your playlists and started playback.`,
+					);
+				}
+			} catch (error) {
+				logger.error('SearchResults', 'Failed to play playlist', {
+					error,
+				});
+			}
 		} else {
 			logger.warn('SearchResults', 'Selected item is not playable', {
 				type: selected?.type,
 			});
 		}
-	}, [selectedIndex, results, play, isActive, musicService, playerDispatch]);
+	}, [
+		selectedIndex,
+		results,
+		play,
+		isActive,
+		musicService,
+		playerDispatch,
+		createPlaylist,
+	]);
 
 	// Play selected result handler (memoized to prevent duplicate registrations)
 	const handleSelect = useCallback(() => {

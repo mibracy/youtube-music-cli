@@ -12,7 +12,6 @@ import type {
 } from '../../types/youtube-music.types.ts';
 import type {
 	VideoSearchResult,
-	PlaylistSearchResult,
 	ChannelSearchResult,
 	SearchResponse as YoutubeiSearchResponse,
 } from '../../types/youtubei.types.ts';
@@ -42,11 +41,6 @@ type MusicSearchLike = {
 	contents?: unknown[];
 };
 
-type MusicSearchSection = {
-	title?: {toString: () => string};
-	contents?: unknown[];
-};
-
 function toMusicSearchType(
 	searchType: SearchOptions['type'] | undefined,
 ): 'all' | 'song' | 'album' | 'artist' | 'playlist' {
@@ -71,27 +65,6 @@ function toMusicSearchType(
 			return 'all';
 		}
 	}
-}
-
-function findShelfByTitle(contents: unknown[], titleKeywords: string[]): {contents?: unknown[]} | undefined {
-	for (const item of contents) {
-		if (!item || typeof item !== 'object') {
-			continue;
-		}
-
-		const section = item as MusicSearchSection;
-		if (!section.title || typeof section.title.toString !== 'function') {
-			continue;
-		}
-
-		const sectionTitle = section.title.toString().toLowerCase();
-		const matches = titleKeywords.some(keyword => sectionTitle.includes(keyword));
-		if (matches) {
-			return item as {contents?: unknown[]};
-		}
-	}
-
-	return undefined;
 }
 
 function getMusicShelfItems(shelf: unknown): MusicSearchItem[] {
@@ -193,17 +166,104 @@ async function getClient() {
 	return ytClient;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getItemId(item: any): string {
+	if (typeof item.id === 'string' && item.id.trim()) {
+		return item.id.trim();
+	}
+	if (typeof item.playlistId === 'string' && item.playlistId.trim()) {
+		return item.playlistId.trim();
+	}
+	if (typeof item.videoId === 'string' && item.videoId.trim()) {
+		return item.videoId.trim();
+	}
+	if (typeof item.content_id === 'string' && item.content_id.trim()) {
+		return item.content_id.trim();
+	}
+
+	// Check endpoints
+	const endpoint = item.endpoint || item.navigationEndpoint;
+	if (endpoint?.payload) {
+		if (
+			typeof endpoint.payload.playlistId === 'string' &&
+			endpoint.payload.playlistId.trim()
+		) {
+			return endpoint.payload.playlistId.trim();
+		}
+		if (
+			typeof endpoint.payload.videoId === 'string' &&
+			endpoint.payload.videoId.trim()
+		) {
+			return endpoint.payload.videoId.trim();
+		}
+		if (
+			typeof endpoint.payload.browseId === 'string' &&
+			endpoint.payload.browseId.trim()
+		) {
+			return endpoint.payload.browseId.trim();
+		}
+	}
+
+	return '';
+}
+
 function getItemTitle(item: MusicSearchItem): string {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const anyItem = item as any;
+
+	// Handle LockupView (used in general search)
+	if (anyItem.type === 'LockupView' && anyItem.metadata?.title?.text) {
+		return anyItem.metadata.title.text;
+	}
+
 	const title = item.title || item.name;
-	if (title) {
+	if (title && typeof title === 'string') {
 		return title;
 	}
 
+	// Try to get title from youtubei.js object if it has a toString or text property
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const titleObj = title as any;
+	if (titleObj && typeof titleObj === 'object') {
+		if (typeof titleObj.text === 'string') {
+			return titleObj.text;
+		}
+		if (
+			typeof titleObj.toString === 'function' &&
+			titleObj.toString() !== '[object Object]'
+		) {
+			return titleObj.toString();
+		}
+	}
+
+	// Some youtubei.js renderers have runs
+	if (anyItem.title?.runs?.[0]?.text) {
+		return anyItem.title.runs[0].text;
+	}
+
 	const flexColumns = (item as Record<string, unknown>).flex_columns as
-		| Array<{title?: {text?: string}}>
+		| Array<{title?: {text?: string}; runs?: Array<{text?: string}>}>
 		| undefined;
-	if (flexColumns?.[0]?.title?.text) {
-		return flexColumns[0].title.text;
+
+	if (flexColumns && flexColumns.length > 0) {
+		for (const column of flexColumns) {
+			if (column.title?.text) {
+				return column.title.text;
+			}
+			if (column.runs && column.runs.length > 0 && column.runs[0]?.text) {
+				return column.runs[0].text;
+			}
+		}
+	}
+
+	// Fallback for some specific renderer types
+	if (anyItem.text?.runs?.[0]?.text) {
+		return anyItem.text.runs[0].text;
+	}
+
+	// Last ditch effort: search for any 'text' property
+	if (anyItem.text && typeof anyItem.text === 'string') {
+		return anyItem.text;
 	}
 
 	return '';
@@ -238,109 +298,122 @@ class MusicService {
 				type: toMusicSearchType(searchType),
 			})) as unknown as MusicSearchLike;
 
-			if (searchType === 'all' || searchType === 'songs') {
-				const songItems = [
-					...getMusicShelfItems(musicSearch.songs),
-					...getMusicShelfItems(musicSearch.videos),
-				];
-				for (const item of songItems) {
-					const track = toTrack(item);
-					if (!track) {
-						continue;
-					}
-
-					results.push({
-						type: 'song',
-						data: track,
-					});
-				}
+			// Gather items from all possible sections/shelves
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const allShelves: any[] = [];
+			if (musicSearch.contents) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				allShelves.push(...(musicSearch as any).contents);
 			}
+			// Named shelves as well (compatibility)
+			if (musicSearch.songs) allShelves.push(musicSearch.songs);
+			if (musicSearch.videos) allShelves.push(musicSearch.videos);
+			if (musicSearch.playlists) allShelves.push(musicSearch.playlists);
+			if (musicSearch.artists) allShelves.push(musicSearch.artists);
+			if (musicSearch.albums) allShelves.push(musicSearch.albums);
 
-			if (searchType === 'all' || searchType === 'playlists') {
-				const playlistItems = getMusicShelfItems(musicSearch.playlists);
-				if (playlistItems.length === 0 && musicSearch.contents) {
-					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['playlist']);
-					if (fallbackShelf) {
-						playlistItems.push(...getMusicShelfItems(fallbackShelf));
-					}
-				}
+			for (const shelf of allShelves) {
+				const shelfItems = getMusicShelfItems(shelf);
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const shelfTitle = (shelf as any).title?.toString().toLowerCase() || '';
 
-				for (const playlist of playlistItems) {
-					const playlistId = playlist.id?.trim();
-					if (!playlistId) {
-						continue;
-					}
+				for (const item of shelfItems) {
+					const id = getItemId(item);
+					if (!id) continue;
 
-					results.push({
-						type: 'playlist',
-						data: {
-							playlistId,
-							name: getItemTitle(playlist) || 'Unknown Playlist',
-							tracks: [],
-						},
-					});
-				}
-			}
+					const title = getItemTitle(item);
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const anyItem = item as any;
 
-			if (searchType === 'all' || searchType === 'artists') {
-				const artistItems = getMusicShelfItems(musicSearch.artists);
-				if (artistItems.length === 0 && musicSearch.contents) {
-					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['artist']);
-					if (fallbackShelf) {
-						artistItems.push(...getMusicShelfItems(fallbackShelf));
-					}
-				}
+					// Determine type
+					let type: SearchResult['type'] | null = null;
 
-				for (const artist of artistItems) {
-					const artistId =
-						artist.id?.trim() ||
-						artist.author?.channel_id ||
-						artist.author?.id ||
-						'';
-					if (!artistId) {
-						continue;
-					}
-
-					results.push({
-						type: 'artist',
-						data: {
-							artistId,
-							name:
-								getItemTitle(artist) ||
-								artist.author?.name ||
-								'Unknown Artist',
-						},
-					});
-				}
-			}
-
-			if (searchType === 'all' || searchType === 'albums') {
-				const albumItems = getMusicShelfItems(musicSearch.albums);
-				if (albumItems.length === 0 && musicSearch.contents) {
-					const fallbackShelf = findShelfByTitle(musicSearch.contents, ['album']);
-					if (fallbackShelf) {
-						albumItems.push(...getMusicShelfItems(fallbackShelf));
-					}
-				}
-
-				for (const album of albumItems) {
-					const albumId = album.id?.trim();
-					if (!albumId) {
-						continue;
+					// Explicit item_type from API
+					if (
+						anyItem.item_type === 'song' ||
+						(anyItem.type === 'MusicResponsiveListItem' &&
+							(anyItem.videoId || anyItem.video_id))
+					) {
+						type = 'song';
+					} else if (
+						anyItem.item_type === 'playlist' ||
+						id.startsWith('VL') ||
+						id.startsWith('PL')
+					) {
+						type = 'playlist';
+					} else if (
+						anyItem.item_type === 'artist' ||
+						(anyItem.subscribers && !anyItem.song_count)
+					) {
+						type = 'artist';
+					} else if (
+						anyItem.item_type === 'album' ||
+						anyItem.year ||
+						anyItem.song_count
+					) {
+						type = 'album';
 					}
 
-					results.push({
-						type: 'album',
-						data: {
-							albumId,
-							name: getItemTitle(album) || 'Unknown Album',
-							artists: (album.artists ?? []).map(artist => ({
-								artistId: artist.channel_id || artist.id || '',
-								name: artist.name ?? 'Unknown',
-							})),
-							tracks: [],
-						},
-					});
+					// Infer from shelf title if still unknown
+					if (!type) {
+						if (shelfTitle.includes('song') || shelfTitle.includes('video'))
+							type = 'song';
+						else if (shelfTitle.includes('playlist')) type = 'playlist';
+						else if (shelfTitle.includes('artist')) type = 'artist';
+						else if (shelfTitle.includes('album')) type = 'album';
+					}
+
+					if (!type && searchType !== 'all') {
+						type = toMusicSearchType(searchType) as SearchResult['type'];
+					}
+
+					if (
+						type === 'song' &&
+						(searchType === 'all' || searchType === 'songs')
+					) {
+						const track = toTrack(item);
+						if (track) results.push({type: 'song', data: track});
+					} else if (
+						type === 'playlist' &&
+						(searchType === 'all' || searchType === 'playlists')
+					) {
+						results.push({
+							type: 'playlist',
+							data: {
+								playlistId: id,
+								name: title || 'Unknown Playlist',
+								tracks: [],
+							},
+						});
+					} else if (
+						type === 'artist' &&
+						(searchType === 'all' || searchType === 'artists')
+					) {
+						results.push({
+							type: 'artist',
+							data: {
+								artistId: id,
+								name: title || anyItem.author?.name || 'Unknown Artist',
+							},
+						});
+					} else if (
+						type === 'album' &&
+						(searchType === 'all' || searchType === 'albums')
+					) {
+						results.push({
+							type: 'album',
+							data: {
+								albumId: id,
+								name: title || 'Unknown Album',
+								// eslint-disable-next-line @typescript-eslint/no-explicit-any
+								artists: (anyItem.artists ?? []).map((artist: any) => ({
+									artistId: artist.channel_id || artist.id || '',
+									name: artist.name ?? 'Unknown',
+								})),
+								tracks: [],
+							},
+						});
+					}
 				}
 			}
 
@@ -353,20 +426,15 @@ class MusicService {
 					const videos = search.videos as VideoSearchResult[] | undefined;
 					if (videos) {
 						for (const video of videos) {
-							const rawVideoId = video.id || video.video_id || '';
-							const videoId = parseVideoId(rawVideoId);
-							if ((!video.type && !rawVideoId) || !videoId) {
-								continue;
-							}
+							const id = getItemId(video);
+							if (!id) continue;
 
 							results.push({
 								type: 'song',
 								data: {
-									videoId,
-									title:
-										(typeof video.title === 'string'
-											? video.title
-											: video.title?.text) || 'Unknown',
+									videoId: id,
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any
+									title: getItemTitle(video as any) || 'Unknown',
 									artists: [
 										{
 											artistId: video.channel_id || video.channel?.id || '',
@@ -387,19 +455,19 @@ class MusicService {
 				}
 
 				if (searchType === 'all' || searchType === 'playlists') {
-					const playlists = search.playlists as
-						| PlaylistSearchResult[]
-						| undefined;
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const playlists = (search as any).playlists;
 					if (playlists) {
 						for (const playlist of playlists) {
+							const id = getItemId(playlist);
+							if (!id) continue;
+
 							results.push({
 								type: 'playlist',
 								data: {
-									playlistId: playlist.id || '',
-									name:
-										(typeof playlist.title === 'string'
-											? playlist.title
-											: playlist.title?.text) || 'Unknown Playlist',
+									playlistId: id,
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any
+									name: getItemTitle(playlist as any) || 'Unknown Playlist',
 									tracks: [],
 								},
 							});
@@ -411,14 +479,18 @@ class MusicService {
 					const channels = search.channels as ChannelSearchResult[] | undefined;
 					if (channels) {
 						for (const channel of channels) {
+							const id = getItemId(channel);
+							if (!id) continue;
+
 							results.push({
 								type: 'artist',
 								data: {
-									artistId: channel.id || channel.channelId || '',
+									artistId: id,
 									name:
-										(typeof channel.author === 'string'
-											? channel.author
-											: channel.author?.name) || 'Unknown Artist',
+										// eslint-disable-next-line @typescript-eslint/no-explicit-any
+										getItemTitle(channel as any) ||
+										channel.name ||
+										'Unknown Artist',
 								},
 							});
 						}
@@ -433,35 +505,64 @@ class MusicService {
 			});
 		}
 
-		// For 'all' search, guarantee 1 from each non-song category, fill rest with songs
+		// For 'all' search, guarantee variety while maintaining relevance (Weighted Variety)
 		if (searchType === 'all' && results.length > 0) {
-			const byType = {
-				songs: [] as SearchResult[],
-				playlists: [] as SearchResult[],
-				artists: [] as SearchResult[],
-				albums: [] as SearchResult[],
+			const seenIds = new Set<string>();
+			const uniqueResults: SearchResult[] = [];
+
+			// First pass: Filter duplicates and organize by type
+			const byType: Record<string, SearchResult[]> = {
+				song: [],
+				playlist: [],
+				artist: [],
+				album: [],
 			};
 
 			for (const r of results) {
-				if (r.type === 'song') byType.songs.push(r);
-				else if (r.type === 'playlist') byType.playlists.push(r);
-				else if (r.type === 'artist') byType.artists.push(r);
-				else if (r.type === 'album') byType.albums.push(r);
+				const id =
+					r.type === 'song'
+						? (r.data as Track).videoId
+						: r.type === 'playlist'
+							? (r.data as Playlist).playlistId
+							: r.type === 'artist'
+								? (r.data as Artist).artistId
+								: (r.data as Album).albumId;
+
+				const uniqueId = `${r.type}:${id}`;
+				if (seenIds.has(uniqueId)) continue;
+				seenIds.add(uniqueId);
+
+				byType[r.type]?.push(r);
+				uniqueResults.push(r);
 			}
 
 			const balanced: SearchResult[] = [];
-			let remaining = resultLimit;
+			let remainingLimit = resultLimit;
+			const typesToInclude = ['artist', 'album', 'playlist'];
+			const includedFromTypes = new Set<string>();
 
-			for (const cat of [byType.albums, byType.artists, byType.playlists]) {
-				if (cat.length > 0 && remaining > 0) {
-					balanced.push(cat[0]!);
-					remaining--;
+			// 1. Ensure at least one from each non-song type if available
+			for (const type of typesToInclude) {
+				const items = byType[type];
+				if (items && items.length > 0 && remainingLimit > 0) {
+					balanced.push(items[0]!);
+					includedFromTypes.add(`${type}:${0}`);
+					remainingLimit--;
 				}
 			}
 
-			const songCount = Math.min(remaining, byType.songs.length);
-			for (let i = 0; i < songCount; i++) {
-				balanced.push(byType.songs[i]!);
+			// 2. Fill the rest with highest-ranked original results that aren't already included
+			for (const r of uniqueResults) {
+				if (remainingLimit <= 0) break;
+
+				const type = r.type;
+				const indexInType = byType[type]?.indexOf(r) ?? -1;
+				const typeKey = `${type}:${indexInType}`;
+
+				if (!includedFromTypes.has(typeKey)) {
+					balanced.push(r);
+					remainingLimit--;
+				}
 			}
 
 			results.length = 0;

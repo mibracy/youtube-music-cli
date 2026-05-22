@@ -140,10 +140,10 @@ export default function PlaylistList() {
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, startPlaylist);
-	useKeyBinding(['r'], handleRename);
+	useKeyBinding(KEYBINDINGS.RENAME_PLAYLIST, handleRename);
 	useKeyBinding(KEYBINDINGS.CREATE_PLAYLIST, handleCreate);
 	useKeyBinding(KEYBINDINGS.DELETE_PLAYLIST, handleDelete);
-	useKeyBinding(KEYBINDINGS.BACK, handleBack);
+	useKeyBinding(KEYBINDINGS.BACK, handleBack, {bypassBlock: true});
 	useKeyBinding(KEYBINDINGS.DOWNLOAD, () => {
 		void handleDownload();
 	});
