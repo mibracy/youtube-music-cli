@@ -97,9 +97,11 @@ export default function HomeLayout() {
 	// Footer: bordered = 3 rows (top, text, bottom), no border = 1 row
 	// Each section: round border + title = 3 rows overhead per section
 	const headerRows = 3;
-	const progressRows = playerState.currentTrack && rows >= 18 ? 4 : 0;
-	const footerRows = rows >= 18 ? 3 : 1;
+	const progressRows = playerState.currentTrack ? 4 : 0;
+	const footerRows = rows >= 25 ? 3 : 1;
 	const sectionBorderTitleRows = 3;
+
+	const shouldHideMenus = rows < 25 && playerState.currentTrack !== null;
 
 	const availableForRightColumn = rows - headerRows - progressRows - footerRows;
 	const itemsPerSection = Math.max(
@@ -114,6 +116,7 @@ export default function HomeLayout() {
 		quickLinks.length + recentHistory.length + recentFavorites.length;
 
 	const handleSelect = () => {
+		if (shouldHideMenus) return;
 		if (selectedIndex < quickLinks.length) {
 			const link = quickLinks[selectedIndex]!;
 			if (link.action) {
@@ -134,10 +137,12 @@ export default function HomeLayout() {
 	};
 
 	useKeyBinding(KEYBINDINGS.UP, () => {
+		if (shouldHideMenus) return;
 		setSelectedIndex(prev => Math.max(0, prev - 1));
 	});
 
 	useKeyBinding(KEYBINDINGS.DOWN, () => {
+		if (shouldHideMenus) return;
 		setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
 	});
 
@@ -180,7 +185,7 @@ export default function HomeLayout() {
 			<Box
 				paddingX={1}
 				justifyContent="center"
-				borderStyle={rows < 18 ? 'single' : 'double'}
+				borderStyle={rows < 25 ? 'single' : 'double'}
 				borderColor={theme.colors.primary}
 			>
 				<Text bold color={theme.colors.primary}>
@@ -188,137 +193,143 @@ export default function HomeLayout() {
 				</Text>
 			</Box>
 
-			<Box flexDirection="row" flexGrow={1} minHeight={0} gap={1}>
-				{/* Left Column: Quick Links */}
-				<Box
-					flexDirection="column"
-					width="25%"
-					borderStyle="round"
-					borderColor={theme.colors.dim}
-					paddingX={1}
-				>
-					<Box marginBottom={0}>
-						<Text bold color={theme.colors.secondary}>
-							Quick Links
-						</Text>
-					</Box>
-					{quickLinks.map((link, index) => (
-						<Box key={link.label}>
-							<Text
-								backgroundColor={
-									selectedIndex === index ? theme.colors.primary : undefined
-								}
-								color={
-									selectedIndex === index
-										? theme.colors.background
-										: theme.colors.text
-								}
-							>
-								{selectedIndex === index ? '> ' : '  '}
-								{link.label}
+			{/* Main Content Area */}
+			{!shouldHideMenus ? (
+				<Box flexDirection="row" flexGrow={1} minHeight={0} gap={1}>
+					{/* Left Column: Quick Links */}
+					<Box
+						flexDirection="column"
+						width="25%"
+						borderStyle="round"
+						borderColor={theme.colors.dim}
+						paddingX={1}
+					>
+						<Box marginBottom={0}>
+							<Text bold color={theme.colors.secondary}>
+								Quick Links
 							</Text>
 						</Box>
-					))}
-				</Box>
-
-				{/* Right Column: Activity */}
-				<Box flexDirection="column" flexGrow={1} minHeight={0}>
-					{/* Recently Played */}
-					<Box
-						flexDirection="column"
-						flexGrow={1}
-						minHeight={0}
-						borderStyle="round"
-						borderColor={theme.colors.dim}
-						paddingX={1}
-					>
-						<Text bold color={theme.colors.secondary}>
-							🕒 Recently Played
-						</Text>
-						{recentHistory.length === 0 ? (
-							<Text color={theme.colors.dim}> No history yet</Text>
-						) : (
-							recentHistory.map((entry, index) => {
-								const actualIndex = index + quickLinks.length;
-								return (
-									<Box key={`${entry.playedAt}-${entry.track.videoId}`}>
-										<Text
-											backgroundColor={
-												selectedIndex === actualIndex
-													? theme.colors.primary
-													: undefined
-											}
-											color={
-												selectedIndex === actualIndex
-													? theme.colors.background
-													: theme.colors.text
-											}
-										>
-											{selectedIndex === actualIndex ? '> ' : '  '}
-											{truncate(entry.track.title, maxTitleLength)}
-										</Text>
-										<Text color={theme.colors.dim} wrap="truncate">
-											{' '}
-											- {entry.track.artists[0]?.name}
-										</Text>
-									</Box>
-								);
-							})
-						)}
+						{quickLinks.map((link, index) => (
+							<Box key={link.label}>
+								<Text
+									backgroundColor={
+										selectedIndex === index ? theme.colors.primary : undefined
+									}
+									color={
+										selectedIndex === index
+											? theme.colors.background
+											: theme.colors.text
+									}
+								>
+									{selectedIndex === index ? '> ' : '  '}
+									{link.label}
+								</Text>
+							</Box>
+						))}
 					</Box>
 
-					{/* Top Favorites */}
-					<Box
-						flexDirection="column"
-						flexGrow={1}
-						minHeight={0}
-						borderStyle="round"
-						borderColor={theme.colors.dim}
-						paddingX={1}
-					>
-						<Text bold color={theme.colors.secondary}>
-							{ICONS.HEART} Recent Favorites
-						</Text>
-						{recentFavorites.length === 0 ? (
-							<Text color={theme.colors.dim}>
-								{' '}
-								No favorites yet (press 'f' while playing)
+					{/* Right Column: Activity */}
+					<Box flexDirection="column" flexGrow={1} minHeight={0}>
+						{/* Recently Played */}
+						<Box
+							flexDirection="column"
+							flexGrow={1}
+							minHeight={0}
+							borderStyle="round"
+							borderColor={theme.colors.dim}
+							paddingX={1}
+						>
+							<Text bold color={theme.colors.secondary}>
+								🕒 Recently Played
 							</Text>
-						) : (
-							recentFavorites.map((track, index) => {
-								const actualIndex =
-									index + quickLinks.length + recentHistory.length;
-								return (
-									<Box key={track.videoId}>
-										<Text
-											backgroundColor={
-												selectedIndex === actualIndex
-													? theme.colors.primary
-													: undefined
-											}
-											color={
-												selectedIndex === actualIndex
-													? theme.colors.background
-													: theme.colors.text
-											}
-										>
-											{selectedIndex === actualIndex ? '> ' : '  '}
-											{truncate(track.title, maxTitleLength)}
-										</Text>
-										<Text color={theme.colors.dim} wrap="truncate">
-											{' '}
-											- {track.artists[0]?.name}
-										</Text>
-									</Box>
-								);
-							})
-						)}
+							{recentHistory.length === 0 ? (
+								<Text color={theme.colors.dim}> No history yet</Text>
+							) : (
+								recentHistory.map((entry, index) => {
+									const actualIndex = index + quickLinks.length;
+									return (
+										<Box key={`${entry.playedAt}-${entry.track.videoId}`}>
+											<Text
+												backgroundColor={
+													selectedIndex === actualIndex
+														? theme.colors.primary
+														: undefined
+												}
+												color={
+													selectedIndex === actualIndex
+														? theme.colors.background
+														: theme.colors.text
+												}
+											>
+												{selectedIndex === actualIndex ? '> ' : '  '}
+												{truncate(entry.track.title, maxTitleLength)}
+											</Text>
+											<Text color={theme.colors.dim} wrap="truncate">
+												{' '}
+												- {entry.track.artists[0]?.name}
+											</Text>
+										</Box>
+									);
+								})
+							)}
+						</Box>
+
+						{/* Top Favorites */}
+						<Box
+							flexDirection="column"
+							flexGrow={1}
+							minHeight={0}
+							borderStyle="round"
+							borderColor={theme.colors.dim}
+							paddingX={1}
+						>
+							<Text bold color={theme.colors.secondary}>
+								{ICONS.HEART} Recent Favorites
+							</Text>
+							{recentFavorites.length === 0 ? (
+								<Text color={theme.colors.dim}>
+									{' '}
+									No favorites yet (press 'f' while playing)
+								</Text>
+							) : (
+								recentFavorites.map((track, index) => {
+									const actualIndex =
+										index + quickLinks.length + recentHistory.length;
+									return (
+										<Box key={track.videoId}>
+											<Text
+												backgroundColor={
+													selectedIndex === actualIndex
+														? theme.colors.primary
+														: undefined
+												}
+												color={
+													selectedIndex === actualIndex
+														? theme.colors.background
+														: theme.colors.text
+												}
+											>
+												{selectedIndex === actualIndex ? '> ' : '  '}
+												{truncate(track.title, maxTitleLength)}
+											</Text>
+											<Text color={theme.colors.dim} wrap="truncate">
+												{' '}
+												- {track.artists[0]?.name}
+											</Text>
+										</Box>
+									);
+								})
+							)}
+						</Box>
 					</Box>
 				</Box>
-			</Box>
+			) : (
+				// Empty box above to help center the player vertically when menus are hidden
+				<Box flexGrow={1} minHeight={0}></Box>
+			)}
 
 			{/* Player Status / Progress Bar */}
-			{playerState.currentTrack && rows >= 18 && (
+			{playerState.currentTrack && (
 				<Box
 					flexDirection="column"
 					borderStyle="round"
@@ -356,17 +367,22 @@ export default function HomeLayout() {
 				</Box>
 			)}
 
+			{shouldHideMenus && (
+				// Empty box below to help center the player vertically when menus are hidden
+				<Box flexGrow={1} minHeight={0}></Box>
+			)}
+
 			{/* Footer / Shortcuts */}
 			<Box
 				paddingX={1}
-				borderStyle={rows < 18 ? undefined : 'single'}
+				borderStyle={rows < 25 ? undefined : 'single'}
 				borderColor={theme.colors.dim}
 				flexDirection="row"
 				justifyContent="space-between"
-			>
+							>
 				<Box>
 					<Text color={theme.colors.dim}>
-						{rows < 18
+						{rows < 25
 							? 'Arrows: Nav • Enter: Select • /: Search • '
 							: 'Navigate: Arrows • Select: Enter • Search: / • '}
 						Quit{' '}
@@ -382,7 +398,7 @@ export default function HomeLayout() {
 						</Text>
 					</Text>
 				</Box>
-				{rows >= 18 && (
+				{rows >= 25 && (
 					<Box>
 						<Text color={theme.colors.dim}>
 							Favorites: f • History: Sft+H • Settings: ,
