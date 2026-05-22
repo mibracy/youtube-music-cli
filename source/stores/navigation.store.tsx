@@ -67,7 +67,10 @@ function navigationReducer(
 			return {...state, searchQuery: action.query};
 
 		case 'SET_SEARCH_CATEGORY':
-			return {...state, searchCategory: action.category};
+			return {
+				...state,
+				searchType: action.searchType as NavigationState['searchType'],
+			};
 
 		case 'SET_SEARCH_FILTERS':
 			return {

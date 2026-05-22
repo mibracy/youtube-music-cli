@@ -111,18 +111,20 @@ export function getQuitSequence(): number {
 }
 
 // Search type cycle signal
-const cycleSearchTypeCallbacks: Set<() => void> = new Set();
+const cycleSearchTypeCallbacks: Set<(shiftHeld: boolean) => void> = new Set();
 
-export function subscribeToSearchTypeCycle(callback: () => void): () => void {
+export function subscribeToSearchTypeCycle(
+	callback: (shiftHeld: boolean) => void,
+): () => void {
 	cycleSearchTypeCallbacks.add(callback);
 	return () => {
 		cycleSearchTypeCallbacks.delete(callback);
 	};
 }
 
-function triggerSearchTypeCycle(): void {
+function triggerSearchTypeCycle(shiftHeld: boolean): void {
 	for (const cb of cycleSearchTypeCallbacks) {
-		cb();
+		cb(shiftHeld);
 	}
 }
 
@@ -202,6 +204,7 @@ export function KeyboardManager() {
 
 			// Tab to cycle search type
 			if (key.tab && currentView === 'search') {
+				triggerSearchTypeCycle(key.shift ?? false);
 				return;
 			}
 
@@ -309,7 +312,7 @@ export function KeyboardManager() {
 
 		// Tab to cycle search type
 		if (key.tab && currentView === 'search') {
-			triggerSearchTypeCycle();
+			triggerSearchTypeCycle(key.shift ?? false);
 			return;
 		}
 

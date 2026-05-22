@@ -1,11 +1,12 @@
 // Search bar component
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useState, useCallback} from 'react';
+import {useState, useCallback, useEffect, useRef} from 'react';
 import React from 'react';
 import {SEARCH_TYPE} from '../../utils/constants.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
-import {Box, Text, useInput} from 'ink';
+import {subscribeToSearchTypeCycle} from '../../hooks/useKeyboard.tsx';
+import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {getConfigService} from '../../services/config/config.service.ts';
 
@@ -23,20 +24,25 @@ function SearchBar({onInput, isActive = true}: Props) {
 	const searchTypes = Object.values(SEARCH_TYPE);
 
 	// Handle type switching
-	const cycleType = useCallback(() => {
-		const currentIndex = searchTypes.indexOf(navState.searchType);
-		const nextIndex = (currentIndex + 1) % searchTypes.length;
-		const nextType = searchTypes[nextIndex];
-		if (nextType) {
-			dispatch({
-				category: 'SET_SEARCH_CATEGORY',
-				searchType: nextType,
-			});
-			if (input) {
-				onInput(input);
+	const cycleType = useCallback(
+		(direction: 'forward' | 'backward' = 'forward') => {
+			const currentIndex = searchTypes.indexOf(navState.searchType);
+			const offset = direction === 'forward' ? 1 : -1;
+			const nextIndex =
+				(currentIndex + offset + searchTypes.length) % searchTypes.length;
+			const nextType = searchTypes[nextIndex];
+			if (nextType) {
+				dispatch({
+					category: 'SET_SEARCH_CATEGORY',
+					searchType: nextType,
+				});
+				if (input) {
+					onInput(input);
+				}
 			}
-		}
-	}, [navState.searchType, searchTypes, dispatch, onInput, input]);
+		},
+		[navState.searchType, searchTypes, dispatch, onInput, input],
+	);
 
 	// Handle submit via ink-text-input's onSubmit
 	const handleSubmit = useCallback(
@@ -50,12 +56,24 @@ function SearchBar({onInput, isActive = true}: Props) {
 		[dispatch, onInput, isActive, config],
 	);
 
-	// Direct Tab handling for search type switching
-	useInput((_input, key) => {
-		if (key.tab) {
-			cycleType();
-		}
-	});
+	// Subscribe to KeyboardManager's search type cycle signal
+	const cycleTypeRef = useRef(cycleType);
+
+	useEffect(() => {
+		cycleTypeRef.current = cycleType;
+	}, [cycleType]);
+
+	useEffect(
+		() =>
+			subscribeToSearchTypeCycle((shiftHeld: boolean) => {
+				if (shiftHeld) {
+					cycleTypeRef.current('backward');
+				} else {
+					cycleTypeRef.current();
+				}
+			}),
+		[],
+	);
 
 	useKeyboardBlocker(isActive);
 
@@ -83,7 +101,7 @@ function SearchBar({onInput, isActive = true}: Props) {
 						{index < searchTypes.length - 1 && ' '}
 					</Text>
 				))}
-				<Text color={theme.colors.dim}> (Tab to switch)</Text>
+				<Text color={theme.colors.dim}> (Tab/Shift+Tab to switch)</Text>
 			</Box>
 
 			{/* Input - using ink-text-input */}
