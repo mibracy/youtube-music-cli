@@ -34,12 +34,17 @@ export default function SearchHistory({onSelect}: Props) {
 		}
 	}, [history, selectedIndex, dispatch, onSelect]);
 
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			<Box
 				borderStyle="double"
 				borderColor={theme.colors.secondary}

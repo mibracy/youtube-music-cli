@@ -1,13 +1,17 @@
 // Home / Startup screen component
 import {Box, Text} from 'ink';
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {useHistory} from '../../stores/history.store.tsx';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {VIEW, KEYBINDINGS} from '../../utils/constants.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {
+	useKeyBinding,
+	subscribeToQuitSequence,
+	getQuitSequence,
+} from '../../hooks/useKeyboard.tsx';
 import {truncate, formatTime} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {ICONS} from '../../utils/icons.ts';
@@ -23,6 +27,9 @@ export default function HomeLayout() {
 	const {columns, rows} = useTerminalSize();
 
 	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [quitState, setQuitState] = useState(getQuitSequence);
+
+	useEffect(() => subscribeToQuitSequence(setQuitState), []);
 
 	const RANDOM_QUERIES = [
 		'top hits 2024',
@@ -80,12 +87,27 @@ export default function HomeLayout() {
 		{label: '🆕 New Releases', view: VIEW.NEW_RELEASES},
 		{label: '💘 Favorites', view: VIEW.FAVORITES},
 		{label: '🕒 History', view: VIEW.HISTORY},
-		{label: '🎲 Play Random Song', action: handlePlayRandom},
-		{label: '🎵 Play Random Favorite', action: handlePlayRandomFavorite},
+		{label: '🎲 Random Song', action: handlePlayRandom},
+		{label: '🎲 Random Favorite', action: handlePlayRandomFavorite},
 	];
 
-	const itemsPerSection = Math.max(1, Math.min(5, Math.floor((rows - 14) / 2)));
-	const recentHistory = history.slice(0, itemsPerSection);
+	// Calculate how many items fit per section based on terminal height
+	// Header: double border = 3 rows (top, text, bottom)
+	// Progress bar: round border = 4 rows (top, currently playing, progress, bottom) — only when track is playing
+	// Footer: bordered = 3 rows (top, text, bottom), no border = 1 row
+	// Each section: round border + title = 3 rows overhead per section
+	const headerRows = 3;
+	const progressRows = playerState.currentTrack && rows >= 18 ? 4 : 0;
+	const footerRows = rows >= 18 ? 3 : 1;
+	const sectionBorderTitleRows = 3;
+
+	const availableForRightColumn = rows - headerRows - progressRows - footerRows;
+	const itemsPerSection = Math.max(
+		1,
+		Math.floor(availableForRightColumn / 2) - sectionBorderTitleRows,
+	);
+
+	const recentHistory = history.slice(0, itemsPerSection + 5);
 	const recentFavorites = favorites.slice(0, itemsPerSection);
 
 	const totalItems =
@@ -112,11 +134,11 @@ export default function HomeLayout() {
 	};
 
 	useKeyBinding(KEYBINDINGS.UP, () => {
-		setSelectedIndex(prev => (prev > 0 ? prev - 1 : totalItems - 1));
+		setSelectedIndex(prev => Math.max(0, prev - 1));
 	});
 
 	useKeyBinding(KEYBINDINGS.DOWN, () => {
-		setSelectedIndex(prev => (prev < totalItems - 1 ? prev + 1 : 0));
+		setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
 	});
 
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
@@ -138,7 +160,7 @@ export default function HomeLayout() {
 		Math.min(playerState.progress, playerState.duration || 0),
 	);
 	const duration = playerState.duration || 0;
-	const barWidth = Math.max(10, columns - 30);
+	const barWidth = Math.max(10, columns - 8);
 	const filledWidth =
 		duration > 0 ? Math.floor((progress / duration) * barWidth) : 0;
 
@@ -147,13 +169,19 @@ export default function HomeLayout() {
 		playerState.currentTrack?.artists?.map(a => a.name).join(', ') ?? '';
 
 	return (
-		<Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} paddingY={0}>
+		<Box
+			flexDirection="column"
+			flexGrow={1}
+			minHeight={0}
+			paddingX={1}
+			paddingY={0}
+		>
 			{/* Header */}
 			<Box
-				borderStyle="double"
-				borderColor={theme.colors.primary}
 				paddingX={1}
 				justifyContent="center"
+				borderStyle={rows < 18 ? 'single' : 'double'}
+				borderColor={theme.colors.primary}
 			>
 				<Text bold color={theme.colors.primary}>
 					🎵 {ICONS.PLAY} youtube-music-cli {ICONS.PLAY} 🎵
@@ -199,6 +227,7 @@ export default function HomeLayout() {
 					<Box
 						flexDirection="column"
 						flexGrow={1}
+						minHeight={0}
 						borderStyle="round"
 						borderColor={theme.colors.dim}
 						paddingX={1}
@@ -213,64 +242,66 @@ export default function HomeLayout() {
 								const actualIndex = index + quickLinks.length;
 								return (
 									<Box key={`${entry.playedAt}-${entry.track.videoId}`}>
-								<Text
-									backgroundColor={
-										selectedIndex === actualIndex
-											? theme.colors.primary
-											: undefined
-									}
-									color={
-										selectedIndex === actualIndex
-											? theme.colors.background
-											: theme.colors.text
-									}
-								>
-									{selectedIndex === actualIndex ? '> ' : '  '}
-									{truncate(entry.track.title, maxTitleLength)}
-								</Text>
-								<Text color={theme.colors.dim} wrap="truncate">
-									{' '}
-									- {entry.track.artists[0]?.name}
-								</Text>
-							</Box>
-						);
-					})
-				)}
-			</Box>
+										<Text
+											backgroundColor={
+												selectedIndex === actualIndex
+													? theme.colors.primary
+													: undefined
+											}
+											color={
+												selectedIndex === actualIndex
+													? theme.colors.background
+													: theme.colors.text
+											}
+										>
+											{selectedIndex === actualIndex ? '> ' : '  '}
+											{truncate(entry.track.title, maxTitleLength)}
+										</Text>
+										<Text color={theme.colors.dim} wrap="truncate">
+											{' '}
+											- {entry.track.artists[0]?.name}
+										</Text>
+									</Box>
+								);
+							})
+						)}
+					</Box>
 
-			{/* Top Favorites */}
-			<Box
-				flexDirection="column"
-				borderStyle="round"
-				borderColor={theme.colors.dim}
-				paddingX={1}
-			>
-				<Text bold color={theme.colors.secondary}>
-					{ICONS.HEART} Recent Favorites
-				</Text>
-				{recentFavorites.length === 0 ? (
-					<Text color={theme.colors.dim}>
-						{' '}
-						No favorites yet (press 'f' while playing)
-					</Text>
-				) : (
-					recentFavorites.map((track, index) => {
-						const actualIndex =
-							index + quickLinks.length + recentHistory.length;
-						return (
-							<Box key={track.videoId}>
-								<Text
-									backgroundColor={
-										selectedIndex === actualIndex
-											? theme.colors.primary
-											: undefined
-									}
-									color={
-										selectedIndex === actualIndex
-											? theme.colors.background
-											: theme.colors.text
-									}
-								>
+					{/* Top Favorites */}
+					<Box
+						flexDirection="column"
+						flexGrow={1}
+						minHeight={0}
+						borderStyle="round"
+						borderColor={theme.colors.dim}
+						paddingX={1}
+					>
+						<Text bold color={theme.colors.secondary}>
+							{ICONS.HEART} Recent Favorites
+						</Text>
+						{recentFavorites.length === 0 ? (
+							<Text color={theme.colors.dim}>
+								{' '}
+								No favorites yet (press 'f' while playing)
+							</Text>
+						) : (
+							recentFavorites.map((track, index) => {
+								const actualIndex =
+									index + quickLinks.length + recentHistory.length;
+								return (
+									<Box key={track.videoId}>
+										<Text
+											backgroundColor={
+												selectedIndex === actualIndex
+													? theme.colors.primary
+													: undefined
+											}
+											color={
+												selectedIndex === actualIndex
+													? theme.colors.background
+													: theme.colors.text
+											}
+										>
 											{selectedIndex === actualIndex ? '> ' : '  '}
 											{truncate(track.title, maxTitleLength)}
 										</Text>
@@ -287,7 +318,7 @@ export default function HomeLayout() {
 			</Box>
 
 			{/* Player Status / Progress Bar */}
-			{playerState.currentTrack && (
+			{playerState.currentTrack && rows >= 18 && (
 				<Box
 					flexDirection="column"
 					borderStyle="round"
@@ -314,12 +345,12 @@ export default function HomeLayout() {
 							{formatTime(progress)} / {formatTime(duration)}
 						</Text>
 					</Box>
-					<Box>
+					<Box justifyContent="center">
 						<Text color={theme.colors.primary}>
 							{'█'.repeat(Math.min(filledWidth, barWidth))}
 						</Text>
 						<Text color={theme.colors.dim}>
-							{'░'.repeat(Math.max(0, barWidth - filledWidth))}
+							{'░'.repeat(Math.max(0, barWidth - (filledWidth + 3)))}
 						</Text>
 					</Box>
 				</Box>
@@ -328,21 +359,36 @@ export default function HomeLayout() {
 			{/* Footer / Shortcuts */}
 			<Box
 				paddingX={1}
-				borderStyle="single"
+				borderStyle={rows < 18 ? undefined : 'single'}
 				borderColor={theme.colors.dim}
 				flexDirection="row"
 				justifyContent="space-between"
 			>
 				<Box>
 					<Text color={theme.colors.dim}>
-						Navigate: Arrows • Select: Enter • Search: / • Quit :q
+						{rows < 18
+							? 'Arrows: Nav • Enter: Select • /: Search • '
+							: 'Navigate: Arrows • Select: Enter • Search: / • '}
+						Quit{' '}
+						<Text
+							color={quitState >= 1 ? theme.colors.success : theme.colors.dim}
+						>
+							:
+						</Text>
+						<Text
+							color={quitState >= 2 ? theme.colors.success : theme.colors.dim}
+						>
+							q
+						</Text>
 					</Text>
 				</Box>
-				<Box>
-					<Text color={theme.colors.dim}>
-						f: Favorites • Shift+H: History • ,: Settings
-					</Text>
-				</Box>
+				{rows >= 18 && (
+					<Box>
+						<Text color={theme.colors.dim}>
+							Favorites: f • History: Sft+H • Settings: ,
+						</Text>
+					</Box>
+				)}
 			</Box>
 		</Box>
 	);

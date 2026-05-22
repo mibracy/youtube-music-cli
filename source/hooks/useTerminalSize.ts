@@ -12,6 +12,7 @@ export function useTerminalSize() {
 		if (!stdout) return;
 
 		const onResize = () => {
+			process.stdout.write('\x1b[2J');
 			setSize({
 				columns: stdout.columns,
 				rows: stdout.rows,

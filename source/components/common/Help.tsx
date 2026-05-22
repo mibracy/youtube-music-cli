@@ -18,7 +18,7 @@ export default function Help() {
 	useKeyBinding(KEYBINDINGS.SELECT, closeHelp);
 
 	return (
-		<Box flexDirection="column" gap={1} padding={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1} padding={1}>
 			<Box
 				borderStyle="single"
 				borderColor={theme.colors.secondary}

@@ -8,7 +8,7 @@ export default function PlayerLayout() {
 	const {state: playerState} = usePlayer();
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" flexGrow={1} minHeight={0}>
 			<NowPlaying />
 			<PlayerControls />
 			{playerState.queue.length > 0 && <QueueList />}

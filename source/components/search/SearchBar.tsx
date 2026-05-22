@@ -4,9 +4,8 @@ import {useState, useCallback} from 'react';
 import React from 'react';
 import {SEARCH_TYPE} from '../../utils/constants.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
-import {Box, Text} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import {getConfigService} from '../../services/config/config.service.ts';
 
@@ -25,7 +24,6 @@ function SearchBar({onInput, isActive = true}: Props) {
 
 	// Handle type switching
 	const cycleType = useCallback(() => {
-		if (!isActive) return;
 		const currentIndex = searchTypes.indexOf(navState.searchType);
 		const nextIndex = (currentIndex + 1) % searchTypes.length;
 		const nextType = searchTypes[nextIndex];
@@ -34,8 +32,11 @@ function SearchBar({onInput, isActive = true}: Props) {
 				category: 'SET_SEARCH_CATEGORY',
 				searchType: nextType,
 			});
+			if (input) {
+				onInput(input);
+			}
 		}
-	}, [navState.searchType, searchTypes, dispatch, isActive]);
+	}, [navState.searchType, searchTypes, dispatch, onInput, input]);
 
 	// Handle submit via ink-text-input's onSubmit
 	const handleSubmit = useCallback(
@@ -49,16 +50,13 @@ function SearchBar({onInput, isActive = true}: Props) {
 		[dispatch, onInput, isActive, config],
 	);
 
-	// Handle clearing search
-	const clearSearch = useCallback(() => {
-		if (isActive) {
-			setInput('');
-			onInput('');
+	// Direct Tab handling for search type switching
+	useInput((_input, key) => {
+		if (key.tab) {
+			cycleType();
 		}
-	}, [isActive, onInput]);
+	});
 
-	useKeyBinding(['tab'], cycleType, {bypassBlock: true});
-	useKeyBinding(['escape'], clearSearch, {bypassBlock: true});
 	useKeyboardBlocker(isActive);
 
 	return (

@@ -37,10 +37,7 @@ export default function HistoryLayout() {
 
 	const maxVisible = Math.max(1, Math.floor((rows - 5) / 3));
 	const maxTitleLength = Math.max(30, columns - 20);
-	const visibleHistory = history.slice(
-		scrollOffset,
-		scrollOffset + maxVisible,
-	);
+	const visibleHistory = history.slice(scrollOffset, scrollOffset + maxVisible);
 	const canScrollUp = scrollOffset > 0;
 	const canScrollDown = scrollOffset + maxVisible < history.length;
 
@@ -79,7 +76,7 @@ export default function HistoryLayout() {
 	});
 
 	return (
-		<Box flexDirection="column" padding={1} gap={0}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1} gap={0}>
 			<Box marginBottom={1}>
 				<Text color={theme.colors.primary} bold>
 					Recently Played ({history.length})
@@ -105,9 +102,7 @@ export default function HistoryLayout() {
 							flexDirection="column"
 							paddingX={1}
 							paddingY={0}
-							backgroundColor={
-								isSelected ? theme.colors.highlight : undefined
-							}
+							backgroundColor={isSelected ? theme.colors.highlight : undefined}
 						>
 							<Box>
 								<Text
@@ -121,26 +116,15 @@ export default function HistoryLayout() {
 								</Text>
 							</Box>
 							<Box>
-								<Text
-									color={theme.colors.text}
-									bold={isSelected}
-								>
+								<Text color={theme.colors.text} bold={isSelected}>
 									{truncate(entry.track.title, maxTitleLength)}
 								</Text>
-								<Text
-									color={
-										isSelected ? theme.colors.text : theme.colors.dim
-									}
-								>
+								<Text color={isSelected ? theme.colors.text : theme.colors.dim}>
 									{artists ? ` • ${artists}` : ''}
 								</Text>
 							</Box>
 							{entry.track.album?.name && (
-								<Text
-									color={
-										isSelected ? theme.colors.text : theme.colors.dim
-									}
-								>
+								<Text color={isSelected ? theme.colors.text : theme.colors.dim}>
 									Album: {entry.track.album.name}
 								</Text>
 							)}

@@ -20,7 +20,7 @@ export default function ProgressBar() {
 		Math.min(playerState.progress, playerState.duration),
 	);
 	const duration = playerState.duration;
-	const totalBarWidth = Math.max(10, columns - 20);
+	const totalBarWidth = Math.max(10, columns - 8);
 	const filledWidth =
 		duration > 0 ? Math.floor((progress / duration) * totalBarWidth) : 0;
 
@@ -38,10 +38,7 @@ export default function ProgressBar() {
 			</Text>
 			<Text color={theme.colors.dim}>
 				{' '}
-				{duration > 0
-					? Math.floor((progress / duration) * 100)
-					: 0}
-				%
+				{duration > 0 ? Math.floor((progress / duration) * 100) : 0}%
 			</Text>
 		</Box>
 	);

@@ -407,9 +407,7 @@ function SearchResults({
 							<>
 								{trackInfo.artistName && (
 									<Text
-										color={
-											isSelected ? theme.colors.text : theme.colors.accent
-										}
+										color={isSelected ? theme.colors.text : theme.colors.accent}
 										bold={isSelected}
 									>
 										{' '}

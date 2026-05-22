@@ -107,8 +107,8 @@ export const KEYBINDINGS = {
 
 	// Player
 	PLAY_PAUSE: [' '],
-	NEXT: ['n', 'right'],
-	PREVIOUS: ['b', 'left'],
+	NEXT: ['n'],
+	PREVIOUS: ['b'],
 	VOLUME_UP: ['=', '+'], // '=' (no shift) or '+' (shift+=) both trigger volume up
 	VOLUME_DOWN: ['-'], // '-' triggers volume down
 	VOLUME_FINE_UP: ['ctrl+='], // Fine-grained +1 step (Ctrl+= to avoid conflict with '+')
@@ -119,8 +119,8 @@ export const KEYBINDINGS = {
 	GAPLESS_TOGGLE: ['shift+g'],
 	CROSSFADE_CYCLE: ['shift+c'],
 	EQUALIZER_CYCLE: ['shift+e'],
-	SEEK_FORWARD: ['shift+right'],
-	SEEK_BACKWARD: ['shift+left'],
+	SEEK_FORWARD: ['right'],
+	SEEK_BACKWARD: ['left'],
 	SPEED_UP: ['>'],
 	SPEED_DOWN: ['<'],
 	AB_LOOP_A: ['{'],
@@ -139,8 +139,8 @@ export const KEYBINDINGS = {
 
 	// Search
 	CLEAR_SEARCH: ['escape'],
-	INCREASE_RESULTS: ['ctrl+m'],
-	DECREASE_RESULTS: ['ctrl+,'], // Changed from 'ctrl+l' to avoid conflict with album filter
+	INCREASE_RESULTS: [']'],
+	DECREASE_RESULTS: ['['],
 	TOGGLE_SUBTITLES: ['u'],
 	SEARCH_FILTER_ARTIST: ['ctrl+a'],
 	SEARCH_FILTER_ALBUM: ['ctrl+l'],

@@ -116,14 +116,13 @@ export default function PlayerControls() {
 	useKeyBinding(KEYBINDINGS.PREVIOUS, previous);
 	useKeyBinding(['up'], volumeUp);
 	useKeyBinding(['down'], volumeDown);
-	useKeyBinding(['left'], previous);
-	useKeyBinding(['right'], next);
 	useKeyBinding(KEYBINDINGS.SPEED_UP, speedUp);
 	useKeyBinding(KEYBINDINGS.SPEED_DOWN, speedDown);
 	useKeyBinding(KEYBINDINGS.SHUFFLE, toggleShuffle);
 	useKeyBinding(KEYBINDINGS.GAPLESS_TOGGLE, toggleGaplessPlayback);
 	useKeyBinding(KEYBINDINGS.CROSSFADE_CYCLE, cycleCrossfadeDuration);
 	useKeyBinding(KEYBINDINGS.EQUALIZER_CYCLE, cycleEqualizerPreset);
+
 	useKeyBinding(KEYBINDINGS.AB_LOOP_A, handleABLoopA);
 	useKeyBinding(KEYBINDINGS.AB_LOOP_B, handleABLoopB);
 	useKeyBinding(KEYBINDINGS.AB_LOOP_CLEAR, handleABLoopClear);
@@ -152,7 +151,8 @@ export default function PlayerControls() {
 		<Box flexDirection="column" gap={1}>
 			<Box
 				flexDirection="row"
-				justifyContent="space-between"
+				flexWrap="wrap"
+				columnGap={4}
 				paddingX={2}
 				borderStyle="classic"
 				borderColor={theme.colors.dim}
@@ -232,12 +232,7 @@ export default function PlayerControls() {
 				</Box>
 			)}
 
-			<Box
-				flexDirection="row"
-				justifyContent="space-between"
-				paddingX={2}
-				gap={2}
-			>
+			<Box flexDirection="row" flexWrap="wrap" columnGap={4} paddingX={2}>
 				<Text color={gaplessPlayback ? theme.colors.primary : theme.colors.dim}>
 					Gapless: {gaplessPlayback ? 'ON' : 'OFF'}
 				</Text>

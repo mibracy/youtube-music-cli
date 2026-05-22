@@ -124,7 +124,7 @@ export default function ExportLayout() {
 	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	return (
-		<Box flexDirection="column" gap={1} paddingX={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1} paddingX={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"
@@ -187,7 +187,9 @@ export default function ExportLayout() {
 						<Box key={playlist.playlistId} paddingX={1}>
 							<Text
 								backgroundColor={
-									index === selectedPlaylist ? theme.colors.highlight : undefined
+									index === selectedPlaylist
+										? theme.colors.highlight
+										: undefined
 								}
 								color={theme.colors.text}
 								bold={index === selectedPlaylist}

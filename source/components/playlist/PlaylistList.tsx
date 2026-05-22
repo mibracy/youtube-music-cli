@@ -149,7 +149,7 @@ export default function PlaylistList() {
 	});
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"
@@ -179,9 +179,7 @@ export default function PlaylistList() {
 							backgroundColor={rowBackground}
 						>
 							<Text
-								color={
-									isSelected ? theme.colors.text : theme.colors.primary
-								}
+								color={isSelected ? theme.colors.text : theme.colors.primary}
 								bold={isSelected}
 							>
 								{index + 1}.
@@ -197,10 +195,7 @@ export default function PlaylistList() {
 										focus
 									/>
 								) : (
-									<Text
-										color={theme.colors.text}
-										bold={isSelected}
-									>
+									<Text color={theme.colors.text} bold={isSelected}>
 										{playlist.name}
 									</Text>
 								)}

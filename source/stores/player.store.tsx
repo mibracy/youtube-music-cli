@@ -155,6 +155,7 @@ export function playerReducer(
 		}
 
 		case 'SEEK':
+			getPlayerService().seek(action.position);
 			return {
 				...state,
 				progress: Math.max(0, Math.min(action.position, state.duration)),

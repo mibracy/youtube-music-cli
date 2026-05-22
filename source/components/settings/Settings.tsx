@@ -1,5 +1,5 @@
 // Settings component
-import {useState} from 'react';
+import {useState, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useTheme} from '../../hooks/useTheme.ts';
@@ -27,7 +27,19 @@ const EQUALIZER_PRESETS: EqualizerPreset[] = [
 ];
 const VOLUME_FADE_PRESETS = [0, 1, 2, 3, 5];
 
+const THEMES = [
+	'dark',
+	'light',
+	'midnight',
+	'matrix',
+	'dracula',
+	'nord',
+	'solarized',
+	'catppuccin',
+] as const;
+
 const SETTINGS_ITEMS = [
+	'Theme',
 	'Stream Quality',
 	'Audio Normalization',
 	'Gapless Playback',
@@ -54,7 +66,7 @@ const SETTINGS_ITEMS = [
 ] as const;
 
 export default function Settings() {
-	const {theme} = useTheme();
+	const {theme, themeName, setTheme} = useTheme();
 	const {dispatch} = useNavigation();
 	const config = getConfigService();
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -124,7 +136,10 @@ export default function Settings() {
 	const [scrollOffset, setScrollOffset] = useState(0);
 	const canScrollUp = scrollOffset > 0;
 	const canScrollDown = scrollOffset + maxVisible < SETTINGS_ITEMS.length;
-	const visibleSettings = SETTINGS_ITEMS.slice(scrollOffset, scrollOffset + maxVisible);
+	const visibleSettings = SETTINGS_ITEMS.slice(
+		scrollOffset,
+		scrollOffset + maxVisible,
+	);
 
 	const navigateUp = () => {
 		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
@@ -271,6 +286,13 @@ export default function Settings() {
 		config.setLLMConfig({...config.getLLMConfig(), endpoint: nextEndpoint});
 	};
 
+	const cycleTheme = () => {
+		const currentIndex = THEMES.indexOf(themeName as (typeof THEMES)[number]);
+		const nextTheme = THEMES[(currentIndex + 1) % THEMES.length]!;
+		setTheme(nextTheme);
+		config.set('theme', nextTheme);
+	};
+
 	const cycleSleepTimer = () => {
 		if (isActive) {
 			cancelTimer();
@@ -287,57 +309,64 @@ export default function Settings() {
 	const handleSelect = () => {
 		const actualIndex = scrollOffset + selectedIndex;
 		if (actualIndex === 0) {
-			toggleQuality();
+			cycleTheme();
 		} else if (actualIndex === 1) {
-			toggleNormalization();
+			toggleQuality();
 		} else if (actualIndex === 2) {
-			toggleGaplessPlayback();
+			toggleNormalization();
 		} else if (actualIndex === 3) {
-			cycleCrossfadeDuration();
+			toggleGaplessPlayback();
 		} else if (actualIndex === 4) {
-			cycleVolumeFadeDuration();
+			cycleCrossfadeDuration();
 		} else if (actualIndex === 5) {
-			cycleEqualizerPreset();
+			cycleVolumeFadeDuration();
 		} else if (actualIndex === 6) {
-			toggleSubtitles();
+			cycleEqualizerPreset();
 		} else if (actualIndex === 7) {
-			toggleNotifications();
+			toggleSubtitles();
 		} else if (actualIndex === 8) {
-			toggleDiscordRpc();
+			toggleNotifications();
 		} else if (actualIndex === 9) {
-			toggleLLMEnabled();
+			toggleDiscordRpc();
 		} else if (actualIndex === 10) {
-			setIsEditingApiKey(true);
+			toggleLLMEnabled();
 		} else if (actualIndex === 11) {
-			cycleLLMModel();
+			setIsEditingApiKey(true);
 		} else if (actualIndex === 12) {
-			cycleLLMTemperature();
+			cycleLLMModel();
 		} else if (actualIndex === 13) {
-			cycleLLMEndpoint();
+			cycleLLMTemperature();
 		} else if (actualIndex === 14) {
-			setIsEditingBaseUrl(true);
+			cycleLLMEndpoint();
 		} else if (actualIndex === 15) {
-			toggleDownloadsEnabled();
+			setIsEditingBaseUrl(true);
 		} else if (actualIndex === 16) {
-			setIsEditingDownloadDirectory(true);
+			toggleDownloadsEnabled();
 		} else if (actualIndex === 17) {
-			cycleDownloadFormat();
+			setIsEditingDownloadDirectory(true);
 		} else if (actualIndex === 18) {
-			cycleSleepTimer();
+			cycleDownloadFormat();
 		} else if (actualIndex === 19) {
-			dispatch({category: 'NAVIGATE', view: VIEW.IMPORT});
+			cycleSleepTimer();
 		} else if (actualIndex === 20) {
-			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
+			dispatch({category: 'NAVIGATE', view: VIEW.IMPORT});
 		} else if (actualIndex === 21) {
-			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
+			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
 		} else if (actualIndex === 22) {
+			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
+		} else if (actualIndex === 23) {
 			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
 		}
 	};
 
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	const sleepTimerLabel =
 		isActive && remainingSeconds !== null
@@ -356,20 +385,38 @@ export default function Settings() {
 		);
 
 		switch (actualIndex) {
-			case 0: return box(`Stream Quality: ${quality.toUpperCase()}`);
-			case 1: return box(`Audio Normalization: ${audioNormalization ? 'ON' : 'OFF'}`);
-			case 2: return box(`Gapless Playback: ${gaplessPlayback ? 'ON' : 'OFF'}`);
-			case 3: return box(`Crossfade: ${crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}`);
-			case 4: return box(`Volume Fade: ${volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}`);
-			case 5: return box(`Equalizer: ${formatEqualizerLabel(equalizerPreset)}`);
-			case 6: return box(`Subtitles: ${subtitlesEnabled ? 'ON' : 'OFF'}`);
-			case 7: return box(`Desktop Notifications: ${notifications ? 'ON' : 'OFF'}`);
-			case 8: return box(`Discord Rich Presence: ${discordRpc ? 'ON' : 'OFF'}`);
-			case 9: return box(`AI Assistant: ${llmEnabled ? 'ON' : 'OFF'}`);
+			case 0:
+				return box(
+					`Theme: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`,
+				);
+			case 1:
+				return box(`Stream Quality: ${quality.toUpperCase()}`);
+			case 2:
+				return box(`Audio Normalization: ${audioNormalization ? 'ON' : 'OFF'}`);
+			case 3:
+				return box(`Gapless Playback: ${gaplessPlayback ? 'ON' : 'OFF'}`);
+			case 4:
+				return box(
+					`Crossfade: ${crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}`,
+				);
+			case 5:
+				return box(
+					`Volume Fade: ${volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}`,
+				);
+			case 6:
+				return box(`Equalizer: ${formatEqualizerLabel(equalizerPreset)}`);
+			case 7:
+				return box(`Subtitles: ${subtitlesEnabled ? 'ON' : 'OFF'}`);
+			case 8:
+				return box(`Desktop Notifications: ${notifications ? 'ON' : 'OFF'}`);
+			case 9:
+				return box(`Discord Rich Presence: ${discordRpc ? 'ON' : 'OFF'}`);
 			case 10:
+				return box(`AI Assistant: ${llmEnabled ? 'ON' : 'OFF'}`);
+			case 11:
 				if (isEditingApiKey && isSelected) {
 					return (
-						<Box key={10} paddingX={1}>
+						<Box key={11} paddingX={1}>
 							<TextInput
 								value={llmApiKey}
 								onChange={setLLMApiKey}
@@ -385,21 +432,31 @@ export default function Settings() {
 						</Box>
 					);
 				}
-				return box(`API Key: ${llmApiKey ? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}` : '(not set)'}`);
-			case 11: return box(`Model: ${llmModel}`);
-			case 12: return box(`Temperature: ${llmTemperature.toFixed(1)}`);
-			case 13: return box(`Endpoint: ${llmEndpoint ? llmEndpoint.replace('https://', '').substring(0, 30) : 'Default (Gemini)'}`);
+				return box(
+					`API Key: ${llmApiKey ? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}` : '(not set)'}`,
+				);
+			case 12:
+				return box(`Model: ${llmModel}`);
+			case 13:
+				return box(`Temperature: ${llmTemperature.toFixed(1)}`);
 			case 14:
+				return box(
+					`Endpoint: ${llmEndpoint ? llmEndpoint.replace('https://', '').substring(0, 30) : 'Default (Gemini)'}`,
+				);
+			case 15:
 				if (isEditingBaseUrl && isSelected) {
 					return (
-						<Box key={14} paddingX={1}>
+						<Box key={15} paddingX={1}>
 							<TextInput
 								value={llmBaseUrl}
 								onChange={setLLMBaseUrl}
 								onSubmit={value => {
 									const trimmed = value.trim();
 									setLLMBaseUrl(trimmed);
-									config.setLLMConfig({...config.getLLMConfig(), baseUrl: trimmed});
+									config.setLLMConfig({
+										...config.getLLMConfig(),
+										baseUrl: trimmed,
+									});
 									setIsEditingBaseUrl(false);
 								}}
 								placeholder="Enter base URL (e.g., https://api.kilogateway.com/v1)"
@@ -408,12 +465,15 @@ export default function Settings() {
 						</Box>
 					);
 				}
-				return box(`Base URL: ${llmBaseUrl ? llmBaseUrl.replace('https://', '').substring(0, 30) : '(not set)'}`);
-			case 15: return box(`Download Feature: ${downloadsEnabled ? 'ON' : 'OFF'}`);
+				return box(
+					`Base URL: ${llmBaseUrl ? llmBaseUrl.replace('https://', '').substring(0, 30) : '(not set)'}`,
+				);
 			case 16:
+				return box(`Download Feature: ${downloadsEnabled ? 'ON' : 'OFF'}`);
+			case 17:
 				if (isEditingDownloadDirectory && isSelected) {
 					return (
-						<Box key={16} paddingX={1}>
+						<Box key={17} paddingX={1}>
 							<TextInput
 								value={downloadDirectory}
 								onChange={setDownloadDirectory}
@@ -434,10 +494,11 @@ export default function Settings() {
 					);
 				}
 				return box(`Download Folder: ${downloadDirectory}`);
-			case 17: return box(`Download Format: ${downloadFormat.toUpperCase()}`);
 			case 18:
+				return box(`Download Format: ${downloadFormat.toUpperCase()}`);
+			case 19:
 				return (
-					<Box key={18} paddingX={1}>
+					<Box key={19} paddingX={1}>
 						<Text
 							backgroundColor={bg}
 							color={
@@ -453,11 +514,16 @@ export default function Settings() {
 						</Text>
 					</Box>
 				);
-			case 19: return box('Import Playlists →');
-			case 20: return box('Export Playlists →');
-			case 21: return box('Custom Keybindings →');
-			case 22: return box('Manage Plugins');
-			default: return null;
+			case 20:
+				return box('Import Playlists →');
+			case 21:
+				return box('Export Playlists →');
+			case 22:
+				return box('Custom Keybindings →');
+			case 23:
+				return box('Manage Plugins');
+			default:
+				return null;
 		}
 	};
 

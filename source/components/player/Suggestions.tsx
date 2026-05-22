@@ -5,6 +5,7 @@ import {useYouTubeMusic} from '../../hooks/useYouTubeMusic.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useNavigation} from '../../hooks/useNavigation.ts';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import type {Track} from '../../types/youtube-music.types.ts';
 import {truncate} from '../../utils/format.ts';
@@ -13,6 +14,7 @@ export default function Suggestions() {
 	const {theme} = useTheme();
 	const {state: playerState, play} = usePlayer();
 	const {getSuggestions, isLoading} = useYouTubeMusic();
+	const {dispatch} = useNavigation();
 	const [suggestions, setSuggestions] = useState<Track[]>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -40,9 +42,14 @@ export default function Suggestions() {
 		}
 	}, [selectedIndex, suggestions, play]);
 
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, playSelected);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	if (isLoading) {
 		return <Text color={theme.colors.accent}>Loading suggestions...</Text>;
@@ -53,7 +60,7 @@ export default function Suggestions() {
 	}
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			<Text bold color={theme.colors.primary}>
 				Suggestions based on: {playerState.currentTrack?.title}
 			</Text>

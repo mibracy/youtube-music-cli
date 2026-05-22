@@ -103,7 +103,7 @@ export default function ConfigLayout() {
 	const currentVolume = (config.get('volume') as number) || 70;
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" flexGrow={1} minHeight={0}>
 			{/* Header */}
 			<Box
 				borderStyle="single"

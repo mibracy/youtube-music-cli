@@ -30,7 +30,7 @@ const initialState: NavigationState = {
 	selectedResult: 0,
 	selectedPlaylist: 0,
 	hasSearched: false,
-	searchLimit: 10,
+	searchLimit: 20,
 	history: [],
 	playerMode: 'full',
 	searchFilters: defaultSearchFilters,

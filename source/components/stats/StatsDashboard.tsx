@@ -19,7 +19,7 @@ export default function StatsDashboard() {
 	});
 
 	return (
-		<Box flexDirection="column" padding={1} gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1} gap={1}>
 			<Box marginBottom={1}>
 				<Text color={theme.colors.primary} bold>
 					♪ Listening Stats

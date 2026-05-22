@@ -157,26 +157,27 @@ export default function ShortcutsBar() {
 		>
 			{/* Left: Navigation shortcuts or error message */}
 			{navError ? (
-				<Text color={theme.colors.warning}>{ICONS.WARNING} {navError}</Text>
+				<Text color={theme.colors.warning}>
+					{ICONS.WARNING} {navError}
+				</Text>
 			) : (
-			<Text color={theme.colors.dim}>
-				<Text color={shortcutColor('playPause')}>
-					{playerState.isPlaying ? ICONS.PAUSE : ICONS.PLAY_PAUSE_ON} [Space]
-				</Text>{' '}
-				• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
-				<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text> •{' '}
-				<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
 				<Text color={theme.colors.dim}>
-					{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
-					[R]
-				</Text>{' '}
-				• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
-				<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
-				<Text color={theme.colors.text}>Releases [Sft+N]</Text> •{' '}
-				<Text color={theme.colors.text}>Genres [Sft+M]</Text> •{' '}
-				<Text color={theme.colors.text}>{ICONS.SEARCH} [/]</Text> •{' '}
-				<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
-			</Text>
+					<Text color={shortcutColor('playPause')}>
+						{playerState.isPlaying ? ICONS.PAUSE : ICONS.PLAY_PAUSE_ON} [Space]
+					</Text>{' '}
+					• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
+					<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text> •{' '}
+					<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
+					<Text color={theme.colors.dim}>
+						{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
+						[R]
+					</Text>{' '}
+					• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
+					<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
+					<Text color={theme.colors.text}>Releases [Sft+N]</Text> •{' '}
+					<Text color={theme.colors.text}>Genres [Sft+M]</Text> •{' '}
+					<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
+				</Text>
 			)}
 			<Text color={theme.colors.text}>
 				<Text color={shuffleColor}>{ICONS.SHUFFLE}</Text>{' '}

@@ -24,11 +24,16 @@ export default function AIChatView(): ReactNode {
 		dispatch({category: 'NAVIGATE', view: VIEW.SETTINGS});
 	};
 
+	const goBack = (): void => {
+		dispatch({category: 'GO_BACK'});
+	};
+
 	useKeyBinding(KEYBINDINGS.SELECT, goToSettings);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	if (!isConfigured) {
 		return (
-			<Box flexDirection="column" flexGrow={1} padding={1}>
+			<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1}>
 				<Box
 					flexDirection="column"
 					borderStyle="round"
@@ -53,7 +58,7 @@ export default function AIChatView(): ReactNode {
 	}
 
 	return (
-		<Box flexDirection="column" padding={1} >
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1}>
 			<Box
 				flexDirection="column"
 				borderStyle="round"
