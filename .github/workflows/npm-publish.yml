@@ -32,6 +32,8 @@ jobs:
       - uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.NPM_TOKEN }}
+          access: public  # Ensures scoped packages are published as public
+
 
       - name: Release to GitHub
         uses: softprops/action-gh-release@v3
