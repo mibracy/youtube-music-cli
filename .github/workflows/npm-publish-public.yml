@@ -1,0 +1,50 @@
+name: Public publish to npm
+on:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+  push:
+    tags:
+      - 'p*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+      - name: Build
+        run: bun run build
+      - name: Compile
+        run: bun run compile
+      - name: Compile Windows
+        run: bun build source/cli.tsx --compile --target=bun-windows-x64 --outfile dist/youtube-music-cli.exe
+      - name: Set package scope from repo owner
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          jq --arg owner "$OWNER" \
+            '.name = "@\($owner)/youtube-music-cli"' \
+            package.json > package.tmp.json && mv package.tmp.json package.json
+      - name: Extract Latest Changelog
+        run: |
+          awk '/^#+ \[?[0-9]/ { if (p) exit; p=1 } p' CHANGELOG.md > latest-release.md
+      - uses: JS-DevTools/npm-publish@v4
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public  # Ensures scoped packages are published as public
+
+      - name: Release to GitHub
+        uses: softprops/action-gh-release@v3
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            dist/youtube-music-cli
+            dist/youtube-music-cli.exe
+          body_path: latest-release.md
