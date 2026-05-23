@@ -170,7 +170,7 @@ export default function ShortcutsBar() {
 					</Text>{' '}
 					• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
 					<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text>
-					{columns >= 130 && (
+					{columns >= 140 && (
 						<Text>
 							{' '}•{' '}
 							<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
