@@ -1,4 +1,4 @@
-name: Publish Homebrew Formula
+name: Public publish Homebrew Formula
 
 on:
   workflow_dispatch:
