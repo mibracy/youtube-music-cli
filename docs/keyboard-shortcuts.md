@@ -28,11 +28,9 @@ These work from any screen.
 | ----------------- | ----------------------------------- |
 | `Space`           | Play / Pause                        |
 | `n`               | Next track                          |
-| `→` (Right arrow) | Next track                          |
 | `b`               | Previous track                      |
-| `←` (Left arrow)  | Previous track                      |
-| `Shift+→`         | Seek forward 10 seconds             |
-| `Shift+←`         | Seek backward 10 seconds            |
+| `→` (Right arrow) | Seek forward 5 seconds              |
+| `←` (Left arrow)  | Seek backward 5 seconds             |
 | `=`               | Volume up (+5%)                     |
 | `-`               | Volume down (-5%)                   |
 | `f`               | Toggle favorite                     |
@@ -41,14 +39,12 @@ These work from any screen.
 
 ## Navigation
 
-| Key         | Action                      |
-| ----------- | --------------------------- |
-| `↑` / `k`   | Move selection up           |
-| `↓` / `j`   | Move selection down         |
-| `Enter`     | Select / Confirm            |
-| `Esc`       | Go back                     |
-| `Tab`       | Next result (in search)     |
-| `Shift+Tab` | Previous result (in search) |
+| Key       | Action              |
+| --------- | ------------------- |
+| `↑` / `k` | Move selection up   |
+| `↓` / `j` | Move selection down |
+| `Enter`   | Select / Confirm    |
+| `Esc`     | Go back             |
 
 ## Search
 
@@ -56,6 +52,7 @@ These work from any screen.
 | --------- | -------------------------------------- |
 | `/`       | Focus search input                     |
 | `Enter`   | Execute search                         |
+| `Tab`     | Switch search type                     |
 | `Esc`     | Clear search / Close                   |
 | `]`       | Show more results                      |
 | `[`       | Show fewer results                     |

@@ -12,7 +12,6 @@ import type {
 } from '../../types/youtube-music.types.ts';
 import type {
 	VideoSearchResult,
-	PlaylistSearchResult,
 	ChannelSearchResult,
 	SearchResponse as YoutubeiSearchResponse,
 } from '../../types/youtubei.types.ts';
@@ -39,6 +38,7 @@ type MusicSearchLike = {
 	albums?: {contents?: unknown[]};
 	artists?: {contents?: unknown[]};
 	playlists?: {contents?: unknown[]};
+	contents?: unknown[];
 };
 
 function toMusicSearchType(
@@ -82,7 +82,7 @@ function getMusicShelfItems(shelf: unknown): MusicSearchItem[] {
 	);
 }
 
-function parseVideoId(value: string): string | null {
+export function parseVideoId(value: string): string | null {
 	const trimmedValue = value.trim();
 	if (!trimmedValue) {
 		return null;
@@ -166,6 +166,109 @@ async function getClient() {
 	return ytClient;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getItemId(item: any): string {
+	if (typeof item.id === 'string' && item.id.trim()) {
+		return item.id.trim();
+	}
+	if (typeof item.playlistId === 'string' && item.playlistId.trim()) {
+		return item.playlistId.trim();
+	}
+	if (typeof item.videoId === 'string' && item.videoId.trim()) {
+		return item.videoId.trim();
+	}
+	if (typeof item.content_id === 'string' && item.content_id.trim()) {
+		return item.content_id.trim();
+	}
+
+	// Check endpoints
+	const endpoint = item.endpoint || item.navigationEndpoint;
+	if (endpoint?.payload) {
+		if (
+			typeof endpoint.payload.playlistId === 'string' &&
+			endpoint.payload.playlistId.trim()
+		) {
+			return endpoint.payload.playlistId.trim();
+		}
+		if (
+			typeof endpoint.payload.videoId === 'string' &&
+			endpoint.payload.videoId.trim()
+		) {
+			return endpoint.payload.videoId.trim();
+		}
+		if (
+			typeof endpoint.payload.browseId === 'string' &&
+			endpoint.payload.browseId.trim()
+		) {
+			return endpoint.payload.browseId.trim();
+		}
+	}
+
+	return '';
+}
+
+function getItemTitle(item: MusicSearchItem): string {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const anyItem = item as any;
+
+	// Handle LockupView (used in general search)
+	if (anyItem.type === 'LockupView' && anyItem.metadata?.title?.text) {
+		return anyItem.metadata.title.text;
+	}
+
+	const title = item.title || item.name;
+	if (title && typeof title === 'string') {
+		return title;
+	}
+
+	// Try to get title from youtubei.js object if it has a toString or text property
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const titleObj = title as any;
+	if (titleObj && typeof titleObj === 'object') {
+		if (typeof titleObj.text === 'string') {
+			return titleObj.text;
+		}
+		if (
+			typeof titleObj.toString === 'function' &&
+			titleObj.toString() !== '[object Object]'
+		) {
+			return titleObj.toString();
+		}
+	}
+
+	// Some youtubei.js renderers have runs
+	if (anyItem.title?.runs?.[0]?.text) {
+		return anyItem.title.runs[0].text;
+	}
+
+	const flexColumns = (item as Record<string, unknown>).flex_columns as
+		| Array<{title?: {text?: string}; runs?: Array<{text?: string}>}>
+		| undefined;
+
+	if (flexColumns && flexColumns.length > 0) {
+		for (const column of flexColumns) {
+			if (column.title?.text) {
+				return column.title.text;
+			}
+			if (column.runs && column.runs.length > 0 && column.runs[0]?.text) {
+				return column.runs[0].text;
+			}
+		}
+	}
+
+	// Fallback for some specific renderer types
+	if (anyItem.text?.runs?.[0]?.text) {
+		return anyItem.text.runs[0].text;
+	}
+
+	// Last ditch effort: search for any 'text' property
+	if (anyItem.text && typeof anyItem.text === 'string') {
+		return anyItem.text;
+	}
+
+	return '';
+}
+
 class MusicService {
 	private readonly searchCache = getSearchCache();
 
@@ -195,86 +298,122 @@ class MusicService {
 				type: toMusicSearchType(searchType),
 			})) as unknown as MusicSearchLike;
 
-			if (searchType === 'all' || searchType === 'songs') {
-				const songItems = [
-					...getMusicShelfItems(musicSearch.songs),
-					...getMusicShelfItems(musicSearch.videos),
-				];
-				for (const item of songItems) {
-					const track = toTrack(item);
-					if (!track) {
-						continue;
-					}
-
-					results.push({
-						type: 'song',
-						data: track,
-					});
-				}
+			// Gather items from all possible sections/shelves
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const allShelves: any[] = [];
+			if (musicSearch.contents) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				allShelves.push(...(musicSearch as any).contents);
 			}
+			// Named shelves as well (compatibility)
+			if (musicSearch.songs) allShelves.push(musicSearch.songs);
+			if (musicSearch.videos) allShelves.push(musicSearch.videos);
+			if (musicSearch.playlists) allShelves.push(musicSearch.playlists);
+			if (musicSearch.artists) allShelves.push(musicSearch.artists);
+			if (musicSearch.albums) allShelves.push(musicSearch.albums);
 
-			if (searchType === 'all' || searchType === 'playlists') {
-				for (const playlist of getMusicShelfItems(musicSearch.playlists)) {
-					const playlistId = playlist.id?.trim();
-					if (!playlistId) {
-						continue;
+			for (const shelf of allShelves) {
+				const shelfItems = getMusicShelfItems(shelf);
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const shelfTitle = (shelf as any).title?.toString().toLowerCase() || '';
+
+				for (const item of shelfItems) {
+					const id = getItemId(item);
+					if (!id) continue;
+
+					const title = getItemTitle(item);
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const anyItem = item as any;
+
+					// Determine type
+					let type: SearchResult['type'] | null = null;
+
+					// Explicit item_type from API
+					if (
+						anyItem.item_type === 'song' ||
+						(anyItem.type === 'MusicResponsiveListItem' &&
+							(anyItem.videoId || anyItem.video_id))
+					) {
+						type = 'song';
+					} else if (
+						anyItem.item_type === 'playlist' ||
+						id.startsWith('VL') ||
+						id.startsWith('PL')
+					) {
+						type = 'playlist';
+					} else if (
+						anyItem.item_type === 'artist' ||
+						(anyItem.subscribers && !anyItem.song_count)
+					) {
+						type = 'artist';
+					} else if (
+						anyItem.item_type === 'album' ||
+						anyItem.year ||
+						anyItem.song_count
+					) {
+						type = 'album';
 					}
 
-					results.push({
-						type: 'playlist',
-						data: {
-							playlistId,
-							name: playlist.title || playlist.name || 'Unknown Playlist',
-							tracks: [],
-						},
-					});
-				}
-			}
-
-			if (searchType === 'all' || searchType === 'artists') {
-				for (const artist of getMusicShelfItems(musicSearch.artists)) {
-					const artistId =
-						artist.id?.trim() ||
-						artist.author?.channel_id ||
-						artist.author?.id ||
-						'';
-					if (!artistId) {
-						continue;
+					// Infer from shelf title if still unknown
+					if (!type) {
+						if (shelfTitle.includes('song') || shelfTitle.includes('video'))
+							type = 'song';
+						else if (shelfTitle.includes('playlist')) type = 'playlist';
+						else if (shelfTitle.includes('artist')) type = 'artist';
+						else if (shelfTitle.includes('album')) type = 'album';
 					}
 
-					results.push({
-						type: 'artist',
-						data: {
-							artistId,
-							name:
-								artist.name ||
-								artist.title ||
-								artist.author?.name ||
-								'Unknown Artist',
-						},
-					});
-				}
-			}
-
-			if (searchType === 'all' || searchType === 'albums') {
-				for (const album of getMusicShelfItems(musicSearch.albums)) {
-					const albumId = album.id?.trim();
-					if (!albumId) {
-						continue;
+					if (!type && searchType !== 'all') {
+						type = toMusicSearchType(searchType) as SearchResult['type'];
 					}
 
-					results.push({
-						type: 'album',
-						data: {
-							albumId,
-							name: album.title || album.name || 'Unknown Album',
-							artists: (album.artists ?? []).map(artist => ({
-								artistId: artist.channel_id || artist.id || '',
-								name: artist.name ?? 'Unknown',
-							})),
-							tracks: [],
-						},
-					});
+					if (
+						type === 'song' &&
+						(searchType === 'all' || searchType === 'songs')
+					) {
+						const track = toTrack(item);
+						if (track) results.push({type: 'song', data: track});
+					} else if (
+						type === 'playlist' &&
+						(searchType === 'all' || searchType === 'playlists')
+					) {
+						results.push({
+							type: 'playlist',
+							data: {
+								playlistId: id,
+								name: title || 'Unknown Playlist',
+								tracks: [],
+							},
+						});
+					} else if (
+						type === 'artist' &&
+						(searchType === 'all' || searchType === 'artists')
+					) {
+						results.push({
+							type: 'artist',
+							data: {
+								artistId: id,
+								name: title || anyItem.author?.name || 'Unknown Artist',
+							},
+						});
+					} else if (
+						type === 'album' &&
+						(searchType === 'all' || searchType === 'albums')
+					) {
+						results.push({
+							type: 'album',
+							data: {
+								albumId: id,
+								name: title || 'Unknown Album',
+								// eslint-disable-next-line @typescript-eslint/no-explicit-any
+								artists: (anyItem.artists ?? []).map((artist: any) => ({
+									artistId: artist.channel_id || artist.id || '',
+									name: artist.name ?? 'Unknown',
+								})),
+								tracks: [],
+							},
+						});
+					}
 				}
 			}
 
@@ -287,20 +426,15 @@ class MusicService {
 					const videos = search.videos as VideoSearchResult[] | undefined;
 					if (videos) {
 						for (const video of videos) {
-							const rawVideoId = video.id || video.video_id || '';
-							const videoId = parseVideoId(rawVideoId);
-							if ((!video.type && !rawVideoId) || !videoId) {
-								continue;
-							}
+							const id = getItemId(video);
+							if (!id) continue;
 
 							results.push({
 								type: 'song',
 								data: {
-									videoId,
-									title:
-										(typeof video.title === 'string'
-											? video.title
-											: video.title?.text) || 'Unknown',
+									videoId: id,
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any
+									title: getItemTitle(video as any) || 'Unknown',
 									artists: [
 										{
 											artistId: video.channel_id || video.channel?.id || '',
@@ -321,19 +455,19 @@ class MusicService {
 				}
 
 				if (searchType === 'all' || searchType === 'playlists') {
-					const playlists = search.playlists as
-						| PlaylistSearchResult[]
-						| undefined;
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const playlists = (search as any).playlists;
 					if (playlists) {
 						for (const playlist of playlists) {
+							const id = getItemId(playlist);
+							if (!id) continue;
+
 							results.push({
 								type: 'playlist',
 								data: {
-									playlistId: playlist.id || '',
-									name:
-										(typeof playlist.title === 'string'
-											? playlist.title
-											: playlist.title?.text) || 'Unknown Playlist',
+									playlistId: id,
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any
+									name: getItemTitle(playlist as any) || 'Unknown Playlist',
 									tracks: [],
 								},
 							});
@@ -345,14 +479,18 @@ class MusicService {
 					const channels = search.channels as ChannelSearchResult[] | undefined;
 					if (channels) {
 						for (const channel of channels) {
+							const id = getItemId(channel);
+							if (!id) continue;
+
 							results.push({
 								type: 'artist',
 								data: {
-									artistId: channel.id || channel.channelId || '',
+									artistId: id,
 									name:
-										(typeof channel.author === 'string'
-											? channel.author
-											: channel.author?.name) || 'Unknown Artist',
+										// eslint-disable-next-line @typescript-eslint/no-explicit-any
+										getItemTitle(channel as any) ||
+										channel.name ||
+										'Unknown Artist',
 								},
 							});
 						}
@@ -365,6 +503,70 @@ class MusicService {
 				searchType,
 				error: error instanceof Error ? error.message : String(error),
 			});
+		}
+
+		// For 'all' search, guarantee variety while maintaining relevance (Weighted Variety)
+		if (searchType === 'all' && results.length > 0) {
+			const seenIds = new Set<string>();
+			const uniqueResults: SearchResult[] = [];
+
+			// First pass: Filter duplicates and organize by type
+			const byType: Record<string, SearchResult[]> = {
+				song: [],
+				playlist: [],
+				artist: [],
+				album: [],
+			};
+
+			for (const r of results) {
+				const id =
+					r.type === 'song'
+						? (r.data as Track).videoId
+						: r.type === 'playlist'
+							? (r.data as Playlist).playlistId
+							: r.type === 'artist'
+								? (r.data as Artist).artistId
+								: (r.data as Album).albumId;
+
+				const uniqueId = `${r.type}:${id}`;
+				if (seenIds.has(uniqueId)) continue;
+				seenIds.add(uniqueId);
+
+				byType[r.type]?.push(r);
+				uniqueResults.push(r);
+			}
+
+			const balanced: SearchResult[] = [];
+			let remainingLimit = resultLimit;
+			const typesToInclude = ['artist', 'album', 'playlist'];
+			const includedFromTypes = new Set<string>();
+
+			// 1. Ensure at least one from each non-song type if available
+			for (const type of typesToInclude) {
+				const items = byType[type];
+				if (items && items.length > 0 && remainingLimit > 0) {
+					balanced.push(items[0]!);
+					includedFromTypes.add(`${type}:${0}`);
+					remainingLimit--;
+				}
+			}
+
+			// 2. Fill the rest with highest-ranked original results that aren't already included
+			for (const r of uniqueResults) {
+				if (remainingLimit <= 0) break;
+
+				const type = r.type;
+				const indexInType = byType[type]?.indexOf(r) ?? -1;
+				const typeKey = `${type}:${indexInType}`;
+
+				if (!includedFromTypes.has(typeKey)) {
+					balanced.push(r);
+					remainingLimit--;
+				}
+			}
+
+			results.length = 0;
+			results.push(...balanced);
 		}
 
 		const response: SearchResponse = {
@@ -385,20 +587,100 @@ class MusicService {
 			return null;
 		}
 
-		return {
-			videoId: normalizedVideoId,
-			title: 'Unknown Track',
-			artists: [],
-		};
+		try {
+			const yt = await getClient();
+			const info = await yt.getBasicInfo(normalizedVideoId);
+			const basicInfo = info.basic_info;
+
+			return {
+				videoId: normalizedVideoId,
+				title: basicInfo.title ?? 'Unknown Track',
+				artists: basicInfo.channel
+					? [
+							{
+								artistId: basicInfo.channel.id,
+								name: basicInfo.channel.name,
+							},
+						]
+					: basicInfo.author
+						? [
+								{
+									artistId: basicInfo.channel_id ?? '',
+									name: basicInfo.author,
+								},
+							]
+						: [],
+				duration: basicInfo.duration ?? 0,
+			};
+		} catch (error) {
+			logger.warn(
+				'MusicService',
+				'getTrack: failed to fetch video info, using stub',
+				{
+					videoId: normalizedVideoId,
+					error: error instanceof Error ? error.message : String(error),
+				},
+			);
+
+			return {
+				videoId: normalizedVideoId,
+				title: 'Unknown Track',
+				artists: [],
+			};
+		}
 	}
 
 	async getAlbum(albumId: string): Promise<Album> {
-		return {
-			albumId,
-			name: 'Unknown Album',
-			artists: [],
-			tracks: [],
-		} as unknown as Album;
+		try {
+			const yt = await getClient();
+			const albumData = (await yt.music.getAlbum(albumId)) as {
+				title?: string;
+				artists?: Array<{name?: string; channel_id?: string; id?: string}>;
+				contents?: Array<{
+					id?: string;
+					video_id?: string;
+					title?: string;
+					artists?: Array<{name?: string; channel_id?: string; id?: string}>;
+					duration?: number | {seconds?: number};
+				}>;
+			};
+			logger.debug('MusicService', 'getAlbum data', {albumData});
+			const tracks: Track[] = (albumData.contents || [])
+				.map(item => ({
+					videoId: item.video_id || item.id || '',
+					title: item.title || 'Unknown Title',
+					artists: (item.artists || []).map(a => ({
+						artistId: a.channel_id,
+						name: a.name,
+					})),
+					duration:
+						typeof item.duration === 'number'
+							? item.duration
+							: (item.duration?.seconds ?? 0),
+				}))
+				.filter(t => t.videoId !== '') as Track[];
+
+			return {
+				albumId,
+				name: albumData.title || 'Unknown Album',
+				artists: (albumData.artists || []).map(a => ({
+					artistId: a.channel_id,
+					name: a.name,
+				})),
+				tracks,
+			} as Album;
+		} catch (error) {
+			logger.error('MusicService', 'getAlbum failed', {
+				albumId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return {
+				albumId,
+				name: 'Unknown Album',
+				artists: [],
+				tracks: [],
+			};
+		}
 	}
 
 	async getArtist(artistId: string): Promise<Artist> {

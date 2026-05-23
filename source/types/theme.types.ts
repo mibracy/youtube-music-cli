@@ -22,6 +22,7 @@ export type ColorName =
 export type ThemeColors = {
 	primary: ColorName;
 	secondary: ColorName;
+	highlight: ColorName;
 	background: ColorName;
 	text: ColorName;
 	accent: ColorName;

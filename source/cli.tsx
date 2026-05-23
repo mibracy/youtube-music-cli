@@ -575,7 +575,7 @@ if (command === 'plugins') {
 					});
 				} else {
 					// Also render the CLI UI
-					render(<App flags={flags} />);
+					render(<App flags={flags} />, {alternateScreen: true});
 				}
 			} catch (error) {
 				console.error(
@@ -618,7 +618,7 @@ if (command === 'plugins') {
 			}
 
 			// Render the app
-			render(<App flags={flags} />);
+			render(<App flags={flags} />, {alternateScreen: true});
 		})();
 	}
 }

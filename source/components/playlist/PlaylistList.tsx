@@ -3,7 +3,7 @@ import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useCallback, useState} from 'react';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {usePlaylist} from '../../hooks/usePlaylist.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
@@ -140,16 +140,16 @@ export default function PlaylistList() {
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, startPlaylist);
-	useKeyBinding(['r'], handleRename);
+	useKeyBinding(KEYBINDINGS.RENAME_PLAYLIST, handleRename);
 	useKeyBinding(KEYBINDINGS.CREATE_PLAYLIST, handleCreate);
 	useKeyBinding(KEYBINDINGS.DELETE_PLAYLIST, handleDelete);
-	useKeyBinding(KEYBINDINGS.BACK, handleBack);
+	useKeyBinding(KEYBINDINGS.BACK, handleBack, {bypassBlock: true});
 	useKeyBinding(KEYBINDINGS.DOWNLOAD, () => {
 		void handleDownload();
 	});
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"
@@ -170,7 +170,7 @@ export default function PlaylistList() {
 					const isSelected = index === selectedIndex;
 					const isRenaming =
 						renamingPlaylistId === playlist.playlistId && isSelected;
-					const rowBackground = isSelected ? theme.colors.secondary : undefined;
+					const rowBackground = isSelected ? theme.colors.highlight : undefined;
 
 					return (
 						<Box
@@ -179,9 +179,7 @@ export default function PlaylistList() {
 							backgroundColor={rowBackground}
 						>
 							<Text
-								color={
-									isSelected ? theme.colors.background : theme.colors.primary
-								}
+								color={isSelected ? theme.colors.text : theme.colors.primary}
 								bold={isSelected}
 							>
 								{index + 1}.
@@ -197,12 +195,7 @@ export default function PlaylistList() {
 										focus
 									/>
 								) : (
-									<Text
-										color={
-											isSelected ? theme.colors.background : theme.colors.text
-										}
-										bold={isSelected}
-									>
+									<Text color={theme.colors.text} bold={isSelected}>
 										{playlist.name}
 									</Text>
 								)}

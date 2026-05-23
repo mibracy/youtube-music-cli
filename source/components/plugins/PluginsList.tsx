@@ -37,8 +37,8 @@ export default function PluginsList({
 				return (
 					<Box key={plugin.manifest.id} paddingX={1}>
 						<Text
-							backgroundColor={isSelected ? theme.colors.primary : undefined}
-							color={isSelected ? theme.colors.background : theme.colors.text}
+							backgroundColor={isSelected ? theme.colors.highlight : undefined}
+							color={theme.colors.text}
 							bold={isSelected}
 						>
 							<Text color={isSelected ? undefined : statusColor}>

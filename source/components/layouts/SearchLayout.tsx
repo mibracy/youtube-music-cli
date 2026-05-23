@@ -8,15 +8,17 @@ import type {
 	SearchResult,
 	SearchDurationFilter,
 } from '../../types/youtube-music.types.ts';
+import type {NavigationState} from '../../types/navigation.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import SearchBar from '../search/SearchBar.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {ICONS} from '../../utils/icons.ts';
 import TextInput from 'ink-text-input';
 import {applySearchFilters} from '../../utils/search-filters.ts';
+import {parseVideoId} from '../../services/youtube-music/api.ts';
 
 type FilterField = 'artist' | 'album' | 'year';
 
@@ -36,8 +38,8 @@ const DURATION_ORDER: SearchDurationFilter[] = [
 function SearchLayout() {
 	const {theme} = useTheme();
 	const {state: navState, dispatch} = useNavigation();
-	const {state: playerState} = usePlayer();
-	const {isLoading, error, search} = useYouTubeMusic();
+	const {state: playerState, play} = usePlayer();
+	const {isLoading, error, search, getTrack} = useYouTubeMusic();
 	const [rawResults, setRawResults] = useState<SearchResult[]>([]);
 	const filteredResults = useMemo(
 		() => applySearchFilters(rawResults, navState.searchFilters),
@@ -48,6 +50,10 @@ function SearchLayout() {
 	const [actionMessage, setActionMessage] = useState<string | null>(null);
 	const actionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const lastAutoSearchedQueryRef = useRef<string | null>(null);
+	const searchSettingsRef = useRef({
+		type: navState.searchType,
+		limit: navState.searchLimit,
+	});
 	const [editingFilter, setEditingFilter] = useState<FilterField | null>(null);
 	const [filterDraft, setFilterDraft] = useState('');
 
@@ -89,12 +95,23 @@ function SearchLayout() {
 
 	// Handle search action
 	const performSearch = useCallback(
-		async (query: string) => {
+		async (query: string, typeOverride?: NavigationState['searchType']) => {
 			if (!query || isSearching) return;
+
+			// Detect YouTube URLs → play instantly instead of searching
+			const videoId = parseVideoId(query);
+			if (videoId && query.includes('://')) {
+				const track = await getTrack(videoId);
+				if (track) {
+					play(track, {clearQueue: true});
+				}
+
+				return;
+			}
 
 			setIsSearching(true);
 			const response = await search(query, {
-				type: navState.searchType,
+				type: typeOverride ?? navState.searchType,
 				limit: navState.searchLimit,
 			});
 
@@ -108,7 +125,15 @@ function SearchLayout() {
 			}
 			setIsSearching(false);
 		},
-		[search, navState.searchType, navState.searchLimit, dispatch, isSearching],
+		[
+			search,
+			navState.searchType,
+			navState.searchLimit,
+			dispatch,
+			isSearching,
+			getTrack,
+			play,
+		],
 	);
 
 	// Adjust results limit
@@ -122,6 +147,26 @@ function SearchLayout() {
 
 	useKeyBinding(KEYBINDINGS.INCREASE_RESULTS, increaseLimit);
 	useKeyBinding(KEYBINDINGS.DECREASE_RESULTS, decreaseLimit);
+
+	// Re-search when type or limit changes
+	useEffect(() => {
+		const prev = searchSettingsRef.current;
+		const changed =
+			prev.type !== navState.searchType || prev.limit !== navState.searchLimit;
+		searchSettingsRef.current = {
+			type: navState.searchType,
+			limit: navState.searchLimit,
+		};
+		if (changed && navState.searchQuery && navState.hasSearched) {
+			performSearch(navState.searchQuery);
+		}
+	}, [
+		navState.searchType,
+		navState.searchLimit,
+		navState.searchQuery,
+		navState.hasSearched,
+		performSearch,
+	]);
 
 	// Open search history
 	const goToHistory = useCallback(() => {
@@ -172,13 +217,8 @@ function SearchLayout() {
 		}
 	}, [editingFilter, isTyping, dispatch]);
 
-	// Handle escape in search - go to home
-	const goToHome = useCallback(() => {
-		dispatch({category: 'NAVIGATE', view: VIEW.HOME});
-	}, [dispatch]);
-
 	useKeyBinding(KEYBINDINGS.BACK, goBack);
-	useKeyBinding(['escape'], goToHome, {bypassBlock: true});
+	useKeyBinding(['escape'], goBack, {bypassBlock: true});
 
 	const handleMixCreated = useCallback((message: string) => {
 		setActionMessage(message);
@@ -238,7 +278,7 @@ function SearchLayout() {
 			: 'Any';
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" flexGrow={1} minHeight={0}>
 			{/* Now Playing indicator */}
 			{playerState.currentTrack && (
 				<Box>
@@ -264,8 +304,8 @@ function SearchLayout() {
 
 			<SearchBar
 				isActive={!editingFilter && isTyping && !isSearching}
-				onInput={input => {
-					void performSearch(input);
+				onInput={(input, type) => {
+					void performSearch(input, type);
 				}}
 			/>
 
@@ -329,7 +369,7 @@ function SearchLayout() {
 			<Text color={theme.colors.dim}>
 				{isTyping
 					? 'Type to search, Enter to start, Esc to clear'
-					: `Arrows to navigate, Enter to play, M mix, Shift+D download, Ctrl+M/Ctrl+, more/fewer results (${navState.searchLimit}), H history, Esc to type`}
+					: `Arrows to navigate, Enter to play, M mix, Shift+D download, [/] less/more results (${navState.searchLimit}), H history, Esc to type`}
 			</Text>
 		</Box>
 	);

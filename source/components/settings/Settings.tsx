@@ -1,13 +1,14 @@
 // Settings component
-import {useState} from 'react';
+import {useState, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {getConfigService} from '../../services/config/config.service.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {useSleepTimer} from '../../hooks/useSleepTimer.ts';
+import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {formatTime} from '../../utils/format.ts';
 import type {
 	DownloadFormat,
@@ -26,7 +27,19 @@ const EQUALIZER_PRESETS: EqualizerPreset[] = [
 ];
 const VOLUME_FADE_PRESETS = [0, 1, 2, 3, 5];
 
+const THEMES = [
+	'dark',
+	'light',
+	'midnight',
+	'matrix',
+	'dracula',
+	'nord',
+	'solarized',
+	'catppuccin',
+] as const;
+
 const SETTINGS_ITEMS = [
+	'Theme',
 	'Stream Quality',
 	'Audio Normalization',
 	'Gapless Playback',
@@ -53,7 +66,7 @@ const SETTINGS_ITEMS = [
 ] as const;
 
 export default function Settings() {
-	const {theme} = useTheme();
+	const {theme, themeName, setTheme} = useTheme();
 	const {dispatch} = useNavigation();
 	const config = getConfigService();
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -118,18 +131,36 @@ export default function Settings() {
 		presets,
 	} = useSleepTimer();
 
+	const {rows} = useTerminalSize();
+	const maxVisible = Math.max(1, Math.floor((rows - 6) / 3));
+	const [scrollOffset, setScrollOffset] = useState(0);
+	const canScrollUp = scrollOffset > 0;
+	const canScrollDown = scrollOffset + maxVisible < SETTINGS_ITEMS.length;
+	const visibleSettings = SETTINGS_ITEMS.slice(
+		scrollOffset,
+		scrollOffset + maxVisible,
+	);
+
 	const navigateUp = () => {
 		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
 			return;
 		}
-		setSelectedIndex(prev => Math.max(0, prev - 1));
+		if (selectedIndex > 0) {
+			setSelectedIndex(prev => prev - 1);
+		} else if (canScrollUp) {
+			setScrollOffset(offset => offset - 1);
+		}
 	};
 
 	const navigateDown = (): void => {
 		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
 			return;
 		}
-		setSelectedIndex(prev => Math.min(SETTINGS_ITEMS.length - 1, prev + 1));
+		if (selectedIndex < visibleSettings.length - 1) {
+			setSelectedIndex(prev => prev + 1);
+		} else if (canScrollDown) {
+			setScrollOffset(offset => offset + 1);
+		}
 	};
 
 	const toggleQuality = () => {
@@ -255,6 +286,13 @@ export default function Settings() {
 		config.setLLMConfig({...config.getLLMConfig(), endpoint: nextEndpoint});
 	};
 
+	const cycleTheme = () => {
+		const currentIndex = THEMES.indexOf(themeName as (typeof THEMES)[number]);
+		const nextTheme = THEMES[(currentIndex + 1) % THEMES.length]!;
+		setTheme(nextTheme);
+		config.set('theme', nextTheme);
+	};
+
 	const cycleSleepTimer = () => {
 		if (isActive) {
 			cancelTimer();
@@ -269,66 +307,228 @@ export default function Settings() {
 	};
 
 	const handleSelect = () => {
-		if (selectedIndex === 0) {
+		const actualIndex = scrollOffset + selectedIndex;
+		if (actualIndex === 0) {
+			cycleTheme();
+		} else if (actualIndex === 1) {
 			toggleQuality();
-		} else if (selectedIndex === 1) {
+		} else if (actualIndex === 2) {
 			toggleNormalization();
-		} else if (selectedIndex === 2) {
+		} else if (actualIndex === 3) {
 			toggleGaplessPlayback();
-		} else if (selectedIndex === 3) {
+		} else if (actualIndex === 4) {
 			cycleCrossfadeDuration();
-		} else if (selectedIndex === 4) {
+		} else if (actualIndex === 5) {
 			cycleVolumeFadeDuration();
-		} else if (selectedIndex === 5) {
+		} else if (actualIndex === 6) {
 			cycleEqualizerPreset();
-		} else if (selectedIndex === 6) {
+		} else if (actualIndex === 7) {
 			toggleSubtitles();
-		} else if (selectedIndex === 7) {
+		} else if (actualIndex === 8) {
 			toggleNotifications();
-		} else if (selectedIndex === 8) {
+		} else if (actualIndex === 9) {
 			toggleDiscordRpc();
-		} else if (selectedIndex === 9) {
+		} else if (actualIndex === 10) {
 			toggleLLMEnabled();
-		} else if (selectedIndex === 10) {
+		} else if (actualIndex === 11) {
 			setIsEditingApiKey(true);
-		} else if (selectedIndex === 11) {
+		} else if (actualIndex === 12) {
 			cycleLLMModel();
-		} else if (selectedIndex === 12) {
+		} else if (actualIndex === 13) {
 			cycleLLMTemperature();
-		} else if (selectedIndex === 13) {
+		} else if (actualIndex === 14) {
 			cycleLLMEndpoint();
-		} else if (selectedIndex === 14) {
+		} else if (actualIndex === 15) {
 			setIsEditingBaseUrl(true);
-		} else if (selectedIndex === 15) {
+		} else if (actualIndex === 16) {
 			toggleDownloadsEnabled();
-		} else if (selectedIndex === 16) {
+		} else if (actualIndex === 17) {
 			setIsEditingDownloadDirectory(true);
-		} else if (selectedIndex === 17) {
+		} else if (actualIndex === 18) {
 			cycleDownloadFormat();
-		} else if (selectedIndex === 18) {
+		} else if (actualIndex === 19) {
 			cycleSleepTimer();
-		} else if (selectedIndex === 19) {
+		} else if (actualIndex === 20) {
 			dispatch({category: 'NAVIGATE', view: VIEW.IMPORT});
-		} else if (selectedIndex === 20) {
+		} else if (actualIndex === 21) {
 			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
-		} else if (selectedIndex === 21) {
+		} else if (actualIndex === 22) {
 			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
-		} else if (selectedIndex === 22) {
+		} else if (actualIndex === 23) {
 			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
 		}
 	};
 
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	const sleepTimerLabel =
 		isActive && remainingSeconds !== null
 			? `Sleep Timer: ${formatTime(remainingSeconds)} remaining (Enter to cancel)`
 			: 'Sleep Timer: Off (Enter to set)';
 
+	const renderSettingItem = (actualIndex: number, isSelected: boolean) => {
+		const bg = isSelected ? theme.colors.highlight : undefined;
+
+		const box = (content: string) => (
+			<Box key={actualIndex} paddingX={1}>
+				<Text backgroundColor={bg} color={theme.colors.text} bold={isSelected}>
+					{content}
+				</Text>
+			</Box>
+		);
+
+		switch (actualIndex) {
+			case 0:
+				return box(
+					`Theme: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`,
+				);
+			case 1:
+				return box(`Stream Quality: ${quality.toUpperCase()}`);
+			case 2:
+				return box(`Audio Normalization: ${audioNormalization ? 'ON' : 'OFF'}`);
+			case 3:
+				return box(`Gapless Playback: ${gaplessPlayback ? 'ON' : 'OFF'}`);
+			case 4:
+				return box(
+					`Crossfade: ${crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}`,
+				);
+			case 5:
+				return box(
+					`Volume Fade: ${volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}`,
+				);
+			case 6:
+				return box(`Equalizer: ${formatEqualizerLabel(equalizerPreset)}`);
+			case 7:
+				return box(`Subtitles: ${subtitlesEnabled ? 'ON' : 'OFF'}`);
+			case 8:
+				return box(`Desktop Notifications: ${notifications ? 'ON' : 'OFF'}`);
+			case 9:
+				return box(`Discord Rich Presence: ${discordRpc ? 'ON' : 'OFF'}`);
+			case 10:
+				return box(`AI Assistant: ${llmEnabled ? 'ON' : 'OFF'}`);
+			case 11:
+				if (isEditingApiKey && isSelected) {
+					return (
+						<Box key={11} paddingX={1}>
+							<TextInput
+								value={llmApiKey}
+								onChange={setLLMApiKey}
+								onSubmit={value => {
+									const trimmed = value.trim();
+									setLLMApiKey(trimmed);
+									config.setLLMApiKey(trimmed);
+									setIsEditingApiKey(false);
+								}}
+								placeholder="Enter your Gemini API key"
+								focus
+							/>
+						</Box>
+					);
+				}
+				return box(
+					`API Key: ${llmApiKey ? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}` : '(not set)'}`,
+				);
+			case 12:
+				return box(`Model: ${llmModel}`);
+			case 13:
+				return box(`Temperature: ${llmTemperature.toFixed(1)}`);
+			case 14:
+				return box(
+					`Endpoint: ${llmEndpoint ? llmEndpoint.replace('https://', '').substring(0, 30) : 'Default (Gemini)'}`,
+				);
+			case 15:
+				if (isEditingBaseUrl && isSelected) {
+					return (
+						<Box key={15} paddingX={1}>
+							<TextInput
+								value={llmBaseUrl}
+								onChange={setLLMBaseUrl}
+								onSubmit={value => {
+									const trimmed = value.trim();
+									setLLMBaseUrl(trimmed);
+									config.setLLMConfig({
+										...config.getLLMConfig(),
+										baseUrl: trimmed,
+									});
+									setIsEditingBaseUrl(false);
+								}}
+								placeholder="Enter base URL (e.g., https://api.kilogateway.com/v1)"
+								focus
+							/>
+						</Box>
+					);
+				}
+				return box(
+					`Base URL: ${llmBaseUrl ? llmBaseUrl.replace('https://', '').substring(0, 30) : '(not set)'}`,
+				);
+			case 16:
+				return box(`Download Feature: ${downloadsEnabled ? 'ON' : 'OFF'}`);
+			case 17:
+				if (isEditingDownloadDirectory && isSelected) {
+					return (
+						<Box key={17} paddingX={1}>
+							<TextInput
+								value={downloadDirectory}
+								onChange={setDownloadDirectory}
+								onSubmit={value => {
+									const normalized = value.trim();
+									if (!normalized) {
+										setIsEditingDownloadDirectory(false);
+										return;
+									}
+									setDownloadDirectory(normalized);
+									config.set('downloadDirectory', normalized);
+									setIsEditingDownloadDirectory(false);
+								}}
+								placeholder="Download directory"
+								focus
+							/>
+						</Box>
+					);
+				}
+				return box(`Download Folder: ${downloadDirectory}`);
+			case 18:
+				return box(`Download Format: ${downloadFormat.toUpperCase()}`);
+			case 19:
+				return (
+					<Box key={19} paddingX={1}>
+						<Text
+							backgroundColor={bg}
+							color={
+								isSelected
+									? theme.colors.background
+									: isActive
+										? theme.colors.accent
+										: theme.colors.text
+							}
+							bold={isSelected}
+						>
+							{sleepTimerLabel}
+						</Text>
+					</Box>
+				);
+			case 20:
+				return box('Import Playlists →');
+			case 21:
+				return box('Export Playlists →');
+			case 22:
+				return box('Custom Keybindings →');
+			case 23:
+				return box('Manage Plugins');
+			default:
+				return null;
+		}
+	};
+
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={0}>
 			<Box
 				borderStyle="double"
 				borderColor={theme.colors.secondary}
@@ -340,413 +540,19 @@ export default function Settings() {
 				</Text>
 			</Box>
 
-			{/* Stream Quality */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 0 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 0 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 0}
-				>
-					Stream Quality: {quality.toUpperCase()}
+			{canScrollUp && (
+				<Text color={theme.colors.dim}>▲ {scrollOffset} more</Text>
+			)}
+
+			{visibleSettings.map((_item, index) =>
+				renderSettingItem(scrollOffset + index, index === selectedIndex),
+			)}
+
+			{canScrollDown && (
+				<Text color={theme.colors.dim}>
+					▼ {SETTINGS_ITEMS.length - scrollOffset - maxVisible} more
 				</Text>
-			</Box>
-
-			{/* Audio Normalization */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 1 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 1 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 1}
-				>
-					Audio Normalization: {audioNormalization ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Gapless Playback */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 2 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 2 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 2}
-				>
-					Gapless Playback: {gaplessPlayback ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Crossfade Duration */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 3 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 3 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 3}
-				>
-					Crossfade: {crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}
-				</Text>
-			</Box>
-
-			{/* Volume Fade Duration */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 4 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 4 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 4}
-				>
-					Volume Fade:{' '}
-					{volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}
-				</Text>
-			</Box>
-
-			{/* Equalizer Preset */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 5 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 5 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 5}
-				>
-					Equalizer: {formatEqualizerLabel(equalizerPreset)}
-				</Text>
-			</Box>
-
-			{/* Subtitles */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 6 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 6 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 6}
-				>
-					Subtitles: {subtitlesEnabled ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Notifications */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 7 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 7 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 7}
-				>
-					Desktop Notifications: {notifications ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Discord Rich Presence */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 8 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 8 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 8}
-				>
-					Discord Rich Presence: {discordRpc ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* LLM Enabled */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 9 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 9 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 9}
-				>
-					AI Assistant: {llmEnabled ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* LLM API Key */}
-			<Box paddingX={1}>
-				{isEditingApiKey && selectedIndex === 10 ? (
-					<TextInput
-						value={llmApiKey}
-						onChange={setLLMApiKey}
-						onSubmit={value => {
-							const trimmed = value.trim();
-							setLLMApiKey(trimmed);
-							config.setLLMApiKey(trimmed);
-							setIsEditingApiKey(false);
-						}}
-						placeholder="Enter your Gemini API key"
-						focus
-					/>
-				) : (
-					<Text
-						backgroundColor={
-							selectedIndex === 10 ? theme.colors.primary : undefined
-						}
-						color={
-							selectedIndex === 10 ? theme.colors.background : theme.colors.text
-						}
-						bold={selectedIndex === 10}
-					>
-						API Key:{' '}
-						{llmApiKey
-							? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}`
-							: '(not set)'}
-					</Text>
-				)}
-			</Box>
-
-			{/* LLM Model */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 11 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 11 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 11}
-				>
-					Model: {llmModel}
-				</Text>
-			</Box>
-
-			{/* LLM Temperature */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 12 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 12 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 12}
-				>
-					Temperature: {llmTemperature.toFixed(1)}
-				</Text>
-			</Box>
-
-			{/* LLM Endpoint */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 13 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 13 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 13}
-				>
-					Endpoint:{' '}
-					{llmEndpoint
-						? llmEndpoint.replace('https://', '').substring(0, 30)
-						: 'Default (Gemini)'}
-				</Text>
-			</Box>
-
-			{/* LLM Base URL */}
-			<Box paddingX={1}>
-				{isEditingBaseUrl && selectedIndex === 14 ? (
-					<TextInput
-						value={llmBaseUrl}
-						onChange={setLLMBaseUrl}
-						onSubmit={value => {
-							const trimmed = value.trim();
-							setLLMBaseUrl(trimmed);
-							config.setLLMConfig({...config.getLLMConfig(), baseUrl: trimmed});
-							setIsEditingBaseUrl(false);
-						}}
-						placeholder="Enter base URL (e.g., https://api.kilogateway.com/v1)"
-						focus
-					/>
-				) : (
-					<Text
-						backgroundColor={
-							selectedIndex === 14 ? theme.colors.primary : undefined
-						}
-						color={
-							selectedIndex === 14 ? theme.colors.background : theme.colors.text
-						}
-						bold={selectedIndex === 14}
-					>
-						Base URL:{' '}
-						{llmBaseUrl
-							? llmBaseUrl.replace('https://', '').substring(0, 30)
-							: '(not set)'}
-					</Text>
-				)}
-			</Box>
-
-			{/* Downloads Enabled */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 15 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 15 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 15}
-				>
-					Download Feature: {downloadsEnabled ? 'ON' : 'OFF'}
-				</Text>
-			</Box>
-
-			{/* Download Folder */}
-			<Box paddingX={1}>
-				{isEditingDownloadDirectory && selectedIndex === 16 ? (
-					<TextInput
-						value={downloadDirectory}
-						onChange={setDownloadDirectory}
-						onSubmit={value => {
-							const normalized = value.trim();
-							if (!normalized) {
-								setIsEditingDownloadDirectory(false);
-								return;
-							}
-							setDownloadDirectory(normalized);
-							config.set('downloadDirectory', normalized);
-							setIsEditingDownloadDirectory(false);
-						}}
-						placeholder="Download directory"
-						focus
-					/>
-				) : (
-					<Text
-						backgroundColor={
-							selectedIndex === 16 ? theme.colors.primary : undefined
-						}
-						color={
-							selectedIndex === 16 ? theme.colors.background : theme.colors.text
-						}
-						bold={selectedIndex === 16}
-					>
-						Download Folder: {downloadDirectory}
-					</Text>
-				)}
-			</Box>
-
-			{/* Download Format */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 17 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 17 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 17}
-				>
-					Download Format: {downloadFormat.toUpperCase()}
-				</Text>
-			</Box>
-
-			{/* Sleep Timer */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 18 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 18
-							? theme.colors.background
-							: isActive
-								? theme.colors.accent
-								: theme.colors.text
-					}
-					bold={selectedIndex === 18}
-				>
-					{sleepTimerLabel}
-				</Text>
-			</Box>
-
-			{/* Import Playlists */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 19 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 19 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 19}
-				>
-					Import Playlists →
-				</Text>
-			</Box>
-
-			{/* Export Playlists */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 20 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 20 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 20}
-				>
-					Export Playlists →
-				</Text>
-			</Box>
-
-			{/* Custom Keybindings */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 21 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 21 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 21}
-				>
-					Custom Keybindings →
-				</Text>
-			</Box>
-
-			{/* Manage Plugins */}
-			<Box paddingX={1}>
-				<Text
-					backgroundColor={
-						selectedIndex === 22 ? theme.colors.primary : undefined
-					}
-					color={
-						selectedIndex === 22 ? theme.colors.background : theme.colors.text
-					}
-					bold={selectedIndex === 22}
-				>
-					Manage Plugins
-				</Text>
-			</Box>
+			)}
 
 			{/* Info */}
 			<Box marginTop={1}>

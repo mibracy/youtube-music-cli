@@ -236,18 +236,18 @@ youtube-music-cli play dQw4w9WgXcQ --shuffle
 
 ### Playback
 
-| Key       | Action            |
-| --------- | ----------------- |
-| `Space`   | Play / Pause      |
-| `n` / `→` | Next track        |
-| `b` / `←` | Previous track    |
-| `Shift+→` | Seek forward 10s  |
-| `Shift+←` | Seek backward 10s |
-| `=`       | Volume up         |
-| `-`       | Volume down       |
-| `f`       | Toggle favorite   |
-| `s`       | Toggle shuffle    |
-| `r`       | Cycle repeat mode |
+| Key     | Action            |
+| ------- | ----------------- |
+| `Space` | Play / Pause      |
+| `n`     | Next track        |
+| `b`     | Previous track    |
+| `→`     | Seek forward 5s   |
+| `←`     | Seek backward 5s  |
+| `=`     | Volume up         |
+| `-`     | Volume down       |
+| `f`     | Toggle favorite   |
+| `s`     | Toggle shuffle    |
+| `r`     | Cycle repeat mode |
 
 ### Navigation
 

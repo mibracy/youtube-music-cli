@@ -9,7 +9,8 @@ import {
 	useKeyBinding,
 	registerGoHomeCallback,
 	setCurrentViewForCtrlC,
-} from '../../hooks/useKeyboard.ts';
+	KeyboardManager,
+} from '../../hooks/useKeyboard.tsx';
 import SearchLayout from './SearchLayout.tsx';
 import PlayerLayout from './PlayerLayout.tsx';
 import MiniPlayerLayout from './MiniPlayerLayout.tsx';
@@ -43,7 +44,7 @@ function MainLayout() {
 	const {theme} = useTheme();
 	const {state: navState, dispatch} = useNavigation();
 	const {resume} = usePlayer();
-	const {columns} = useTerminalSize();
+	const {columns, rows} = useTerminalSize();
 
 	// Responsive padding based on terminal size
 	const getPadding = () => (columns < 100 ? 0 : 1);
@@ -298,13 +299,22 @@ function MainLayout() {
 	return (
 		<Box
 			flexDirection="column"
+			flexGrow={1}
+			minHeight={0}
 			paddingX={getPadding()}
 			borderStyle="single"
 			borderColor={theme.colors.primary}
 		>
-			{currentView}
+			<Box
+				flexGrow={1}
+				minHeight={Math.max(0, rows - 5)}
+				justifyContent="center"
+			>
+				{currentView}
+			</Box>
 
 			{/* Shortcuts bar at bottom - shows context-relevant shortcuts */}
+			<KeyboardManager />
 			<ShortcutsBar />
 		</Box>
 	);

@@ -1,7 +1,7 @@
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useStats} from '../../stores/stats.store.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import StatsOverview from './StatsOverview.tsx';
@@ -19,7 +19,7 @@ export default function StatsDashboard() {
 	});
 
 	return (
-		<Box flexDirection="column" padding={1} gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1} gap={1}>
 			<Box marginBottom={1}>
 				<Text color={theme.colors.primary} bold>
 					♪ Listening Stats

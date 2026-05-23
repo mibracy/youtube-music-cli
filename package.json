@@ -1,6 +1,6 @@
 {
 	"name": "@involvex/youtube-music-cli",
-	"version": "0.0.77",
+	"version": "0.0.78",
 	"description": "- A Commandline music player for youtube-music",
 	"repository": {
 		"type": "git",
@@ -9,6 +9,9 @@
 	"funding": "https://github.com/sponsors/involvex",
 	"license": "MIT",
 	"author": "involvex",
+	"contributors": [
+		"mibracy"
+	],
 	"type": "module",
 	"bin": {
 		"youtube-music-cli": "dist/source/cli.js",

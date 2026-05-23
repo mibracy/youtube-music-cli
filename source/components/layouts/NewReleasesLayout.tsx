@@ -1,4 +1,5 @@
 import {Box, Text, useInput} from 'ink';
+import {throttleArrowKey} from '../../hooks/useKeyboard.tsx';
 import {useState, useEffect} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
@@ -53,6 +54,12 @@ export default function NewReleasesLayout() {
 			return;
 		}
 
+		if (
+			(key.upArrow || input === 'k' || key.downArrow || input === 'j') &&
+			throttleArrowKey()
+		)
+			return;
+
 		if (key.leftArrow || input === 'h') {
 			setSectionIndex(i => Math.max(0, i - 1));
 			setReleaseIndex(0);
@@ -92,7 +99,7 @@ export default function NewReleasesLayout() {
 	});
 
 	return (
-		<Box flexDirection="column" padding={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1}>
 			<Box marginBottom={1}>
 				<Text color={theme.colors.primary} bold>
 					🌟 New Releases

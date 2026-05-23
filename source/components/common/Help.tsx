@@ -2,7 +2,7 @@
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useCallback} from 'react';
 
@@ -18,7 +18,7 @@ export default function Help() {
 	useKeyBinding(KEYBINDINGS.SELECT, closeHelp);
 
 	return (
-		<Box flexDirection="column" gap={1} padding={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1} padding={1}>
 			<Box
 				borderStyle="single"
 				borderColor={theme.colors.secondary}
@@ -74,7 +74,7 @@ export default function Help() {
 						<Text> | </Text>
 						<Text color={theme.colors.text}>Shift+S</Text> - Toggle Shuffle
 						<Text> | </Text>
-						<Text color={theme.colors.text}>r</Text> - Toggle Repeat
+						<Text color={theme.colors.text}>Shift+L</Text> - Toggle Repeat
 					</Text>
 				</Box>
 
@@ -121,6 +121,8 @@ export default function Help() {
 				<Box paddingX={2}>
 					<Text>
 						<Text color={theme.colors.text}>a</Text> - Add to Playlist
+						<Text> | </Text>
+						<Text color={theme.colors.text}>r</Text> - Rename Playlist
 						<Text> | </Text>
 						<Text color={theme.colors.text}>d</Text> - Remove from Playlist
 						<Text> | </Text>
