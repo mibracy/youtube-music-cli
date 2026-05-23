@@ -8,6 +8,7 @@ import {KEYBINDINGS} from '../../utils/constants.ts';
 import {ICONS} from '../../utils/icons.ts';
 import {logger} from '../../services/logger/logger.service.ts';
 import {subscribeToNavError} from '../../utils/error.ts';
+import { useTerminalSize } from '../../hooks/useTerminalSize.ts';
 
 const FLASH_DURATION_MS = 300;
 
@@ -32,6 +33,8 @@ export default function ShortcutsBar() {
 
 	const [flashState, setFlashState] = useState<Record<string, boolean>>({});
 	const [navError, setNavError] = useState<string | null>(null);
+
+	const {columns, rows} = useTerminalSize();
 
 	useEffect(() => subscribeToNavError(setNavError), []);
 
@@ -166,17 +169,22 @@ export default function ShortcutsBar() {
 						{playerState.isPlaying ? ICONS.PAUSE : ICONS.PLAY_PAUSE_ON} [Space]
 					</Text>{' '}
 					• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
-					<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text> •{' '}
-					<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
-					<Text color={theme.colors.dim}>
-						{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
-						[Sft+L]
-					</Text>{' '}
-					• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
-					<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
-					<Text color={theme.colors.text}>Releases [Sft+N]</Text> •{' '}
-					<Text color={theme.colors.text}>Genres [Sft+M]</Text> •{' '}
-					<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
+					<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text>
+					{columns >= 130 && (
+						<Text>
+							{' '}•{' '}
+							<Text color={theme.colors.dim}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
+							<Text color={theme.colors.dim}>
+								{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
+								[Sft+L]
+							</Text>{' '}
+							• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
+							<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
+							<Text color={theme.colors.text}>Releases [Sft+N]</Text> •{' '}
+							<Text color={theme.colors.text}>Genres [Sft+M]</Text> •{' '}
+							<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
+						</Text>
+					)}
 				</Text>
 			)}
 			<Text color={theme.colors.text}>

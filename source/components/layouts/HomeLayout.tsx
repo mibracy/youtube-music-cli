@@ -101,7 +101,7 @@ export default function HomeLayout() {
 	const footerRows = rows >= 25 ? 3 : 1;
 	const sectionBorderTitleRows = 3;
 
-	const shouldHideMenus = rows < 25 && playerState.currentTrack !== null;
+	const shouldHideMenus = rows < 35 && playerState.currentTrack !== null;
 
 	const availableForRightColumn = rows - headerRows - progressRows - footerRows;
 	const itemsPerSection = Math.max(
@@ -181,17 +181,18 @@ export default function HomeLayout() {
 			paddingX={1}
 			paddingY={0}
 		>
-			{/* Header */}
-			<Box
-				paddingX={1}
-				justifyContent="center"
-				borderStyle={rows < 25 ? 'single' : 'double'}
-				borderColor={theme.colors.primary}
-			>
-				<Text bold color={theme.colors.primary}>
+			{(rows >= 55 || rows <= 35) && (
+				<Box
+					paddingX={1}
+					justifyContent="center"
+					borderStyle={rows < 25 ? 'single' : 'double'}
+					borderColor={theme.colors.primary}
+				>
+					<Text bold color={theme.colors.primary}>
 					🎵 {ICONS.PLAY} youtube-music-cli {ICONS.PLAY} 🎵
-				</Text>
-			</Box>
+					</Text>
+				</Box>
+			)}
 
 			{/* Main Content Area */}
 			{!shouldHideMenus ? (
@@ -398,7 +399,7 @@ export default function HomeLayout() {
 						</Text>
 					</Text>
 				</Box>
-				{rows >= 25 && (
+				{(rows >= 25 && columns >= 130) && (
 					<Box>
 						<Text color={theme.colors.dim}>
 							Favorites: f • History: Sft+H • Settings: ,
