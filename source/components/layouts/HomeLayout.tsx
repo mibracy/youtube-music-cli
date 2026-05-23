@@ -359,10 +359,10 @@ export default function HomeLayout() {
 					</Box>
 					<Box justifyContent="center">
 						<Text color={theme.colors.primary}>
-							{'█'.repeat(Math.min(filledWidth, barWidth))}
+							{'█'.repeat(Math.min(filledWidth, barWidth - 2))}
 						</Text>
 						<Text color={theme.colors.dim}>
-							{'░'.repeat(Math.max(0, barWidth - (filledWidth + 3)))}
+							{'░'.repeat(Math.max(0, barWidth - (filledWidth + 2)))}
 						</Text>
 					</Box>
 				</Box>
