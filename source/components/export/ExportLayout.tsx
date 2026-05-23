@@ -3,7 +3,7 @@ import {useState, useCallback, useMemo} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {
 	getExportService,
@@ -124,7 +124,7 @@ export default function ExportLayout() {
 	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	return (
-		<Box flexDirection="column" gap={1} paddingX={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1} paddingX={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"
@@ -145,13 +145,9 @@ export default function ExportLayout() {
 						<Box key={format.key} paddingX={1}>
 							<Text
 								backgroundColor={
-									index === selectedFormat ? theme.colors.primary : undefined
+									index === selectedFormat ? theme.colors.highlight : undefined
 								}
-								color={
-									index === selectedFormat
-										? theme.colors.background
-										: theme.colors.text
-								}
+								color={theme.colors.text}
 								bold={index === selectedFormat}
 							>
 								{index === selectedFormat ? '► ' : '  '}
@@ -177,13 +173,9 @@ export default function ExportLayout() {
 					<Box paddingX={1}>
 						<Text
 							backgroundColor={
-								selectedPlaylist === -1 ? theme.colors.primary : undefined
+								selectedPlaylist === -1 ? theme.colors.highlight : undefined
 							}
-							color={
-								selectedPlaylist === -1
-									? theme.colors.background
-									: theme.colors.text
-							}
+							color={theme.colors.text}
 							bold={selectedPlaylist === -1}
 						>
 							{selectedPlaylist === -1 ? '► ' : '  '}
@@ -195,13 +187,11 @@ export default function ExportLayout() {
 						<Box key={playlist.playlistId} paddingX={1}>
 							<Text
 								backgroundColor={
-									index === selectedPlaylist ? theme.colors.primary : undefined
-								}
-								color={
 									index === selectedPlaylist
-										? theme.colors.background
-										: theme.colors.text
+										? theme.colors.highlight
+										: undefined
 								}
+								color={theme.colors.text}
 								bold={index === selectedPlaylist}
 							>
 								{index === selectedPlaylist ? '► ' : '  '}

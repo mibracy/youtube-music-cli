@@ -1,5 +1,6 @@
 // Custom keybindings editor — shows all actions and their bound keys
 import {Box, Text, useInput} from 'ink';
+import {throttleArrowKey} from '../../hooks/useKeyboard.tsx';
 import {useState} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
@@ -77,6 +78,12 @@ export default function KeybindingsLayout() {
 			return;
 		}
 
+		if (
+			(key.upArrow || input === 'k' || key.downArrow || input === 'j') &&
+			throttleArrowKey()
+		)
+			return;
+
 		if (key.upArrow || input === 'k') {
 			setSelectedIndex(i => Math.max(0, i - 1));
 		} else if (key.downArrow || input === 'j') {
@@ -100,7 +107,7 @@ export default function KeybindingsLayout() {
 	});
 
 	return (
-		<Box flexDirection="column" padding={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1}>
 			<Box marginBottom={1}>
 				<Text color={theme.colors.primary} bold>
 					Custom Keybindings

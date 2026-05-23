@@ -3,7 +3,7 @@ import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {ICONS} from '../../utils/icons.ts';
 import {truncate} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
@@ -72,9 +72,10 @@ export default function FavoritesList() {
 		return (
 			<Box
 				flexDirection="column"
+				flexGrow={1}
 				alignItems="center"
 				justifyContent="center"
-				height={rows - 10}
+				padding={1}
 			>
 				<Text color={theme.colors.dim}>No favorites yet.</Text>
 				<Text color={theme.colors.dim}>
@@ -85,7 +86,7 @@ export default function FavoritesList() {
 	}
 
 	// Pagination/Windowing
-	const ITEMS_PER_PAGE = Math.max(5, rows - 15); // Adjust based on layout
+	const ITEMS_PER_PAGE = Math.max(3, rows - 20);
 	const startIdx = Math.max(
 		0,
 		Math.min(

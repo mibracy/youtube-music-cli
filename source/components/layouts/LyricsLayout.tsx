@@ -95,7 +95,7 @@ export default function LyricsLayout() {
 	})();
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"

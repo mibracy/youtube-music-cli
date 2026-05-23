@@ -3,7 +3,8 @@ import {useState, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlugins} from '../../stores/plugins.store.tsx';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useNavigation} from '../../hooks/useNavigation.ts';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import PluginsList from '../plugins/PluginsList.tsx';
 import PluginInstallDialog from '../plugins/PluginInstallDialog.tsx';
@@ -12,6 +13,7 @@ type ViewMode = 'list' | 'install' | 'details';
 
 export default function PluginsLayout() {
 	const {theme} = useTheme();
+	const {dispatch: navDispatch} = useNavigation();
 	const {
 		state,
 		dispatch,
@@ -77,6 +79,12 @@ export default function PluginsLayout() {
 		setViewMode('list');
 	}, []);
 
+	const goBack = useCallback(() => {
+		if (viewMode === 'list') {
+			navDispatch({category: 'GO_BACK'});
+		}
+	}, [viewMode, navDispatch]);
+
 	// Key bindings
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
@@ -84,6 +92,7 @@ export default function PluginsLayout() {
 	useKeyBinding(['r'], removePlugin);
 	useKeyBinding(['u'], handleUpdate);
 	useKeyBinding(['i'], openInstall);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	// Show install dialog
 	if (viewMode === 'install') {
@@ -94,7 +103,7 @@ export default function PluginsLayout() {
 	const selectedPlugin = installedPlugins[selectedIndex];
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			{/* Header */}
 			<Box
 				borderStyle="double"

@@ -32,4 +32,8 @@ export const ICONS = {
 
 	// Autoplay / radio
 	AUTOPLAY: '∞', // U+221E
+	RADIO: '📻', // U+1F4FB
+
+	// Feedback
+	WARNING: '⚠', // U+26A0
 } as const;

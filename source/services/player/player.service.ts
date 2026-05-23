@@ -631,6 +631,20 @@ class PlayerService {
 		this.ipcConnectRetries = 0;
 	}
 
+	seek(position: number): void {
+		logger.debug('PlayerService', 'seek() called', {position});
+		if (this.ipcSocket && !this.ipcSocket.destroyed) {
+			this.sendIpcCommand(['set_property', 'time-pos', position]);
+		}
+	}
+
+	seekRelative(delta: number): void {
+		logger.debug('PlayerService', 'seekRelative() called', {delta});
+		if (this.ipcSocket && !this.ipcSocket.destroyed) {
+			this.sendIpcCommand(['seek', delta, 'relative']);
+		}
+	}
+
 	/**
 	 * Detach mode: Save state and clear references without killing mpv process
 	 * Returns the IPC path and current URL for later reattachment

@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import type {SearchResult, Track} from '../../types/youtube-music.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlaylist} from '../../hooks/usePlaylist.ts';
@@ -133,12 +133,86 @@ function SearchResults({
 					error,
 				});
 			}
+		} else if (selected && selected.type === 'playlist') {
+			const playlistData = selected.data as {
+				playlistId: string;
+				name: string;
+			};
+			const playlistId = playlistData.playlistId;
+			const playlistNameFromSearch = playlistData.name;
+
+			try {
+				const fullPlaylist = await musicService.getPlaylist(playlistId);
+				if (fullPlaylist.tracks.length === 0) {
+					logger.warn('SearchResults', 'Playlist has no tracks', {
+						playlistId,
+					});
+					return;
+				}
+
+				// Use search result name if full playlist name is generic
+				const finalName =
+					fullPlaylist.name === 'Unknown Playlist'
+						? playlistNameFromSearch
+						: fullPlaylist.name;
+
+				// Add to local playlists (preserves ID to avoid duplicates)
+				createPlaylist(finalName, fullPlaylist.tracks, playlistId);
+
+				// Replace queue with playlist tracks and start playback
+				playerDispatch({category: 'CLEAR_QUEUE'});
+				playerDispatch({category: 'SET_QUEUE', queue: fullPlaylist.tracks});
+				playerDispatch({category: 'PLAY', track: fullPlaylist.tracks[0]!});
+
+				if (mixCreatedRef.current) {
+					mixCreatedRef.current(
+						`Added "${finalName}" to your playlists and started playback.`,
+					);
+				}
+			} catch (error) {
+				logger.error('SearchResults', 'Failed to play playlist', {
+					error,
+				});
+			}
+		} else if (selected && selected.type === 'album') {
+			const albumData = selected.data as {
+				albumId: string;
+				name: string;
+			};
+			const albumId = albumData.albumId;
+
+			try {
+				const fullAlbum = await musicService.getAlbum(albumId);
+				if (fullAlbum.tracks.length === 0) {
+					logger.warn('SearchResults', 'Album has no tracks', {
+						albumId,
+					});
+					return;
+				}
+
+				// Replace queue with album tracks and start playback
+				playerDispatch({category: 'CLEAR_QUEUE'});
+				playerDispatch({category: 'SET_QUEUE', queue: fullAlbum.tracks});
+				playerDispatch({category: 'PLAY', track: fullAlbum.tracks[0]!});
+			} catch (error) {
+				logger.error('SearchResults', 'Failed to play album', {
+					error,
+				});
+			}
 		} else {
 			logger.warn('SearchResults', 'Selected item is not playable', {
 				type: selected?.type,
 			});
 		}
-	}, [selectedIndex, results, play, isActive, musicService, playerDispatch]);
+	}, [
+		selectedIndex,
+		results,
+		play,
+		isActive,
+		musicService,
+		playerDispatch,
+		createPlaylist,
+	]);
 
 	// Play selected result handler (memoized to prevent duplicate registrations)
 	const handleSelect = useCallback(() => {
@@ -379,24 +453,24 @@ function SearchResults({
 					<Box
 						key={index}
 						paddingX={1}
-						backgroundColor={isSelected ? theme.colors.secondary : undefined}
+						backgroundColor={isSelected ? theme.colors.highlight : undefined}
 					>
 						<Text
-							color={isSelected ? theme.colors.primary : theme.colors.dim}
+							color={isSelected ? theme.colors.text : theme.colors.dim}
 							bold={isSelected}
 						>
 							{(isSelected ? '> ' : '  ') + (index + 1).toString().padEnd(4)}
 						</Text>
 
 						<Text
-							color={isSelected ? theme.colors.primary : typeColor}
+							color={isSelected ? theme.colors.text : typeColor}
 							bold={isSelected}
 						>
 							{result.type.toUpperCase().padEnd(10)}
 						</Text>
 
 						<Text
-							color={isSelected ? theme.colors.primary : theme.colors.text}
+							color={isSelected ? theme.colors.text : theme.colors.text}
 							bold={isSelected}
 						>
 							{isFav ? `${ICONS.HEART} ` : ''}
@@ -407,9 +481,7 @@ function SearchResults({
 							<>
 								{trackInfo.artistName && (
 									<Text
-										color={
-											isSelected ? theme.colors.primary : theme.colors.accent
-										}
+										color={isSelected ? theme.colors.text : theme.colors.accent}
 										bold={isSelected}
 									>
 										{' '}
@@ -419,7 +491,7 @@ function SearchResults({
 
 								{trackInfo.albumName && (
 									<Text
-										color={isSelected ? theme.colors.primary : theme.colors.dim}
+										color={isSelected ? theme.colors.text : theme.colors.dim}
 									>
 										{' '}
 										{truncate(trackInfo.albumName, 16)}
@@ -429,7 +501,7 @@ function SearchResults({
 								{trackInfo.duration > 0 && (
 									<Text
 										color={
-											isSelected ? theme.colors.primary : theme.colors.secondary
+											isSelected ? theme.colors.text : theme.colors.secondary
 										}
 										bold={isSelected}
 									>

@@ -2,7 +2,7 @@
 import {Box, Text} from 'ink';
 import {useState, useCallback} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {getConfigService} from '../../services/config/config.service.ts';
@@ -103,7 +103,7 @@ export default function ConfigLayout() {
 	const currentVolume = (config.get('volume') as number) || 70;
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" flexGrow={1} minHeight={0}>
 			{/* Header */}
 			<Box
 				borderStyle="single"

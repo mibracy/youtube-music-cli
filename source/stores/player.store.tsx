@@ -58,6 +58,7 @@ export function playerReducer(
 				currentTrack: action.track,
 				isPlaying: true,
 				progress: 0,
+				duration: 0,
 				error: null,
 				playRequestId: state.playRequestId + 1,
 			};
@@ -155,6 +156,7 @@ export function playerReducer(
 		}
 
 		case 'SEEK':
+			getPlayerService().seek(action.position);
 			return {
 				...state,
 				progress: Math.max(0, Math.min(action.position, state.duration)),
@@ -831,7 +833,11 @@ function PlayerManager() {
 				// Relaxed check: if we are near the end of the track (within 5s), trigger NEXT.
 				// We do NOT check !state.isPlaying because mpv might be in a weird state
 				// (idle but suppressed pause) if the track actually finished.
-				if (wasAtEndOfQueue && state.progress >= state.duration - 5) {
+				if (
+					wasAtEndOfQueue &&
+					state.duration > 0 &&
+					state.progress >= state.duration - 5
+				) {
 					logger.info(
 						'PlayerManager',
 						'Autoplay: resuming playback via freshly added suggestions',

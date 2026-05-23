@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {getConfigService} from '../../services/config/config.service.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 
 type Props = {
@@ -34,12 +34,17 @@ export default function SearchHistory({onSelect}: Props) {
 		}
 	}, [history, selectedIndex, dispatch, onSelect]);
 
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	return (
-		<Box flexDirection="column" gap={1}>
+		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
 			<Box
 				borderStyle="double"
 				borderColor={theme.colors.secondary}
@@ -58,13 +63,9 @@ export default function SearchHistory({onSelect}: Props) {
 					<Box key={index} paddingX={1}>
 						<Text
 							backgroundColor={
-								selectedIndex === index ? theme.colors.primary : undefined
+								selectedIndex === index ? theme.colors.highlight : undefined
 							}
-							color={
-								selectedIndex === index
-									? theme.colors.background
-									: theme.colors.text
-							}
+							color={theme.colors.text}
 						>
 							{query}
 						</Text>
