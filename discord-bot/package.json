@@ -1,0 +1,24 @@
+{
+	"name": "@involvex/discord-bot",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun run source/index.ts",
+		"build": "bun build source/index.ts --outdir dist --target bun --external ffmpeg-static --external sodium --external @snazzah/davey",
+		"start": "bun run dist/index.js",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@discordjs/voice": "^0.19.2",
+		"@snazzah/davey": "^0.1.11",
+		"@stablelib/xchacha20poly1305": "^1.0.1",
+		"discord.js": "^14.26.4",
+		"opusscript": "^0.1.1",
+		"youtube-ext": "^1.1.25",
+		"youtubei.js": "^17.0.1"
+	},
+	"devDependencies": {
+		"typescript": "^6.0.3"
+	}
+}

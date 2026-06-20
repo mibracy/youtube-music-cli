@@ -15,7 +15,7 @@ import type {
 	ChannelSearchResult,
 	SearchResponse as YoutubeiSearchResponse,
 } from '../../types/youtubei.types.ts';
-import {Innertube, Log} from 'youtubei.js';
+import {ClientType, Innertube, Log, Platform} from 'youtubei.js';
 import {logger} from '../logger/logger.service.ts';
 import {getSearchCache} from '../cache/cache.service.ts';
 
@@ -161,9 +161,43 @@ async function getClient() {
 	if (!ytClient) {
 		// Suppress noisy youtubei.js parser warnings in TUI output.
 		Log.setLevel(Log.Level.ERROR);
+
+		// Provide a JS evaluator for deciphering audio stream URLs.
+		// youtubei.js ships with a no-op eval that throws. We use `new Function()`
+		// because it treats the code as a function body, allowing top-level `return`
+		// statements (which the player decipher code uses).
+		const isBunRuntime =
+			typeof (globalThis as {Bun?: unknown}).Bun !== 'undefined';
+		if (isBunRuntime) {
+			Platform.shim.eval = async (data: {output: string}) => {
+				const fn = new Function(data.output);
+				return fn();
+			};
+		}
+
 		ytClient = await Innertube.create();
 	}
 	return ytClient;
+}
+
+/**
+ * Creates a lightweight Innertube client using the ANDROID client type.
+ * The ANDROID client returns direct stream URLs (no deciphering needed),
+ * which function reliably on Bun's fetch implementation without 403 errors.
+ */
+let ytAndroidClient: Innertube | null = null;
+
+async function getAndroidClient(): Promise<Innertube> {
+	if (!ytAndroidClient) {
+		Log.setLevel(Log.Level.ERROR);
+
+		ytAndroidClient = await Innertube.create({
+			client_type: ClientType.ANDROID,
+			retrieve_player: false,
+		});
+	}
+
+	return ytAndroidClient;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1190,6 +1224,46 @@ class MusicService {
 		const isBunRuntime =
 			typeof (globalThis as {Bun?: unknown}).Bun !== 'undefined';
 
+		// Try Method 0: youtubei.js ANDROID client (direct URLs, works on Bun)
+		try {
+			logger.debug('MusicService', 'Attempting ANDROID client extraction', {
+				videoId,
+			});
+			const yt = await getAndroidClient();
+			const info = await yt.getBasicInfo(videoId);
+
+			if (info.streaming_data) {
+				const allFormats = [
+					...info.streaming_data.adaptive_formats,
+					...info.streaming_data.formats,
+				];
+
+				let format = allFormats.find(
+					f => f.has_audio && !f.has_video && !f.has_text && f.url,
+				);
+
+				if (!format) {
+					format = allFormats.find(f => f.has_audio && f.url);
+				}
+
+				if (format?.url) {
+					const url = `${format.url}&cpn=${info.cpn}`;
+					logger.info('MusicService', 'Using ANDROID client stream URL', {
+						bitrate: format.bitrate,
+						mimeType: format.mime_type,
+					});
+					return url;
+				}
+			}
+
+			logger.warn('MusicService', 'ANDROID client: no direct URL found');
+		} catch (error) {
+			logger.error('MusicService', 'ANDROID client extraction failed', {
+				error: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+		}
+
 		// Try Method 1: @distube/ytdl-core (skip under Bun due undici incompatibility)
 		if (isBunRuntime) {
 			logger.warn(
@@ -1248,7 +1322,86 @@ class MusicService {
 			}
 		}
 
-		// Try Method 2: youtube-ext (lightweight, no parser path)
+		// Try Method 2: youtubei.js (uses already-initialized client)
+		try {
+			logger.debug('MusicService', 'Attempting youtubei.js extraction', {
+				videoId,
+			});
+			const yt = await getClient();
+			const info = await yt.getBasicInfo(videoId);
+
+			if (info.streaming_data) {
+				const allFormats = [
+					...info.streaming_data.adaptive_formats,
+					...info.streaming_data.formats,
+				];
+
+				// Debug format counts for each filter stage
+				const withAudio = allFormats.filter(f => f.has_audio);
+				const noVideo = withAudio.filter(f => !f.has_video);
+				const noText = noVideo.filter(f => !f.has_text);
+				const original = noText.filter(f => f.is_original !== false);
+				const withUrl = original.filter(
+					f => f.url || f.signature_cipher || f.cipher,
+				);
+				logger.debug('MusicService', 'Format filter breakdown', {
+					total: allFormats.length,
+					hasAudio: withAudio.length,
+					noVideo: noVideo.length,
+					noText: noText.length,
+					original: original.length,
+					hasUrlOrCipher: withUrl.length,
+				});
+
+				// Pick best audio format
+				const bestAudio = withUrl.sort((a, b) => b.bitrate - a.bitrate)[0];
+
+				if (!bestAudio) {
+					logger.warn(
+						'MusicService',
+						'youtubei.js: No suitable audio format found',
+						{
+							total: allFormats.length,
+							sampleMimeTypes: allFormats.slice(0, 5).map(f => ({
+								mime: f.mime_type,
+								audio: f.has_audio,
+								video: f.has_video,
+								text: f.has_text,
+								original: f.is_original,
+								hasUrl: !!f.url,
+								hasCipher: !!f.signature_cipher,
+								bitrate: f.bitrate,
+							})),
+						},
+					);
+				} else {
+					const decipheredUrl = await bestAudio.decipher(
+						yt.actions.session.player,
+					);
+
+					if (decipheredUrl) {
+						logger.info('MusicService', 'Using youtubei.js stream URL', {
+							bitrate: bestAudio.bitrate,
+							quality: bestAudio.audio_quality,
+							mimeType: bestAudio.mime_type,
+						});
+						return decipheredUrl;
+					}
+				}
+			} else {
+				logger.warn(
+					'MusicService',
+					'youtubei.js: No streaming_data in response',
+				);
+			}
+		} catch (error) {
+			logger.error('MusicService', 'youtubei.js extraction failed', {
+				error: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+		}
+
+		// Try Method 3: youtube-ext (lightweight, no parser path)
 		try {
 			logger.debug('MusicService', 'Attempting youtube-ext extraction', {
 				videoId,
@@ -1297,7 +1450,7 @@ class MusicService {
 			});
 		}
 
-		// Try Method 3: Invidious API (last resort)
+		// Try Method 4: Invidious API (last resort)
 		try {
 			logger.debug('MusicService', 'Attempting Invidious extraction', {
 				videoId,
@@ -1381,6 +1534,60 @@ class MusicService {
 
 		// If all Invidious instances fail, throw error instead of returning watch URL
 		throw new Error('No Invidious instance returned a valid stream URL');
+	}
+
+	/**
+	 * Get a ReadableStream for a video, fetched through the youtubei.js session
+	 * (which has the cookies and headers needed to avoid 403 from YouTube's CDN).
+	 */
+	async getStreamBody(videoId: string): Promise<ReadableStream<Uint8Array>> {
+		const yt = await getAndroidClient();
+		const info = await yt.getBasicInfo(videoId);
+
+		if (!info.streaming_data) {
+			throw new Error('No streaming data in response');
+		}
+
+		const allFormats = [
+			...info.streaming_data.adaptive_formats,
+			...info.streaming_data.formats,
+		];
+
+		// Prefer audio-only with a direct URL
+		let format = allFormats.find(
+			f => f.has_audio && !f.has_video && !f.has_text && f.url,
+		);
+
+		// Fall back to any audio format with a direct URL
+		if (!format) {
+			format = allFormats.find(f => f.has_audio && f.url);
+		}
+
+		if (!format) {
+			throw new Error('No audio format with a direct URL found');
+		}
+
+		const url = `${format.url}&cpn=${info.cpn}`;
+		const response = await fetch(url, {
+			method: 'GET',
+			headers: {
+				accept: '*/*',
+				origin: 'https://www.youtube.com',
+				referer: 'https://www.youtube.com',
+				Range: 'bytes=0-',
+			},
+			redirect: 'follow',
+		});
+
+		if (!response.ok) {
+			throw new Error(`Stream fetch failed: ${response.status}`);
+		}
+
+		if (!response.body) {
+			throw new Error('No body in stream response');
+		}
+
+		return response.body;
 	}
 }
 

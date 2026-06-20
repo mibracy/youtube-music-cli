@@ -1,8 +1,11 @@
 // Lyrics view layout - displays synced or plain lyrics
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {KEYBINDINGS} from '../../utils/constants.ts';
+import {useNavigation} from '../../hooks/useNavigation.ts';
 import {
 	getLyricsService,
 	type LyricLine,
@@ -22,6 +25,13 @@ export default function LyricsLayout() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const lyricsService = getLyricsService();
+	const {dispatch} = useNavigation();
+
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
 	// Fetch lyrics when track changes
 	useEffect(() => {

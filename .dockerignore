@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.vscode
+*.md
+docs
+tests
+templates
+scripts
+.agents
+plan
+Plans
