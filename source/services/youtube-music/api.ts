@@ -277,8 +277,7 @@ function getItemTitle(item: MusicSearchItem): string {
 	}
 
 	const flexColumns = (item as Record<string, unknown>).flex_columns as
-		| Array<{title?: {text?: string}; runs?: Array<{text?: string}>}>
-		| undefined;
+		Array<{title?: {text?: string}; runs?: Array<{text?: string}>}> | undefined;
 
 	if (flexColumns && flexColumns.length > 0) {
 		for (const column of flexColumns) {
@@ -491,8 +490,7 @@ class MusicService {
 
 				if (searchType === 'all' || searchType === 'playlists') {
 					const playlists = search.playlists as
-						| PlaylistSearchResult[]
-						| undefined;
+						PlaylistSearchResult[] | undefined;
 					if (playlists) {
 						for (const playlist of playlists) {
 							const id = getItemId(playlist);

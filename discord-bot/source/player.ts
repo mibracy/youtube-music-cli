@@ -348,8 +348,7 @@ class VoicePlayer {
 		}
 
 		if (track) {
-			const artistStr =
-				track.artists?.map(a => a.name).join(', ') || 'Unknown';
+			const artistStr = track.artists?.map(a => a.name).join(', ') || 'Unknown';
 			void this.client_.user.setActivity({
 				name: `${track.title} — ${artistStr}`,
 				type: ActivityType.Listening,

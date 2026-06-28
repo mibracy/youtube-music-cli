@@ -238,6 +238,14 @@ export function playerReducer(
 				isPlaying: false,
 			};
 
+		case 'CLEAR_QUEUE_AFTER_CURRENT': {
+			const cutoff = state.queuePosition + 1;
+			return {
+				...state,
+				queue: state.queue.slice(0, cutoff),
+			};
+		}
+
 		case 'SET_QUEUE_POSITION':
 			if (action.position >= 0 && action.position < state.queue.length) {
 				return {
@@ -359,7 +367,7 @@ type PlayerContextValue = {
 	speedUp: () => void;
 	speedDown: () => void;
 	setABLoop: (a: number | null, b: number | null) => void;
-	startRadio: (seed: RadioSeed) => void;
+	startRadio: (seed: RadioSeed, options?: {playNow?: boolean}) => void;
 	stopRadio: () => void;
 };
 
@@ -1078,7 +1086,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			setABLoop: (a: number | null, b: number | null) => {
 				dispatch({category: 'SET_AB_LOOP', a, b});
 			},
-			startRadio: (seed: RadioSeed) => {
+			startRadio: (seed: RadioSeed, _options?: {playNow?: boolean}) => {
 				dispatch({category: 'START_RADIO', seed});
 			},
 			stopRadio: () => {

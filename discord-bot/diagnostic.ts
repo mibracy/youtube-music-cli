@@ -37,7 +37,11 @@ async function run(): Promise<void> {
 		check('opusscript', true);
 		encoder.delete();
 	} catch (error) {
-		check('opusscript', false, error instanceof Error ? error.message : String(error));
+		check(
+			'opusscript',
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
 	}
 
 	try {
@@ -48,23 +52,35 @@ async function run(): Promise<void> {
 			`protocol version ${davey.DAVESession.DAVE_PROTOCOL_VERSION}`,
 		);
 	} catch (error) {
-		check('@snazzah/davey', false, error instanceof Error ? error.message : String(error));
+		check(
+			'@snazzah/davey',
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
 	}
 
 	section('Media tools');
 
 	try {
-		const mpvVersion = execSync('mpv --version', {encoding: 'utf8'}).split('\n')[0];
+		const mpvVersion = execSync('mpv --version', {encoding: 'utf8'}).split(
+			'\n',
+		)[0];
 		check('mpv', true, mpvVersion);
 	} catch (error) {
 		check('mpv', false, error instanceof Error ? error.message : String(error));
 	}
 
 	try {
-		const ffmpegVersion = execSync('ffmpeg -version', {encoding: 'utf8'}).split('\n')[0];
+		const ffmpegVersion = execSync('ffmpeg -version', {encoding: 'utf8'}).split(
+			'\n',
+		)[0];
 		check('ffmpeg', true, ffmpegVersion);
 	} catch (error) {
-		check('ffmpeg', false, error instanceof Error ? error.message : String(error));
+		check(
+			'ffmpeg',
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
 	}
 
 	section('YouTube stream extraction');
@@ -110,35 +126,48 @@ async function run(): Promise<void> {
 		}
 
 		const ffmpeg = spawn('ffmpeg', [
-			'-f', 's16le',
-			'-ar', '48000',
-			'-ac', '2',
-			'-i', fifoPath,
-			'-c:a', 'libopus',
-			'-b:a', '128k',
-			'-f', 'ogg',
-			'-loglevel', 'error',
-			'-t', '3',
+			'-f',
+			's16le',
+			'-ar',
+			'48000',
+			'-ac',
+			'2',
+			'-i',
+			fifoPath,
+			'-c:a',
+			'libopus',
+			'-b:a',
+			'128k',
+			'-f',
+			'ogg',
+			'-loglevel',
+			'error',
+			'-t',
+			'3',
 			'pipe:1',
 		]);
 
-		const mpv = spawn('mpv', [
-			'--no-config',
-			'--no-video',
-			'--really-quiet',
-			'--msg-level=all=error',
-			'--audio-samplerate=48000',
-			'--audio-channels=stereo',
-			'--audio-format=s16',
-			'--ao=pcm',
-			`--ao-pcm-file=${fifoPath}`,
-			'--ao-pcm-waveheader=no',
-			'--referrer=https://www.youtube.com/',
-			'--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-			streamUrl,
-		], {
-			stdio: ['ignore', 'ignore', 'pipe'],
-		});
+		const mpv = spawn(
+			'mpv',
+			[
+				'--no-config',
+				'--no-video',
+				'--really-quiet',
+				'--msg-level=all=error',
+				'--audio-samplerate=48000',
+				'--audio-channels=stereo',
+				'--audio-format=s16',
+				'--ao=pcm',
+				`--ao-pcm-file=${fifoPath}`,
+				'--ao-pcm-waveheader=no',
+				'--referrer=https://www.youtube.com/',
+				'--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+				streamUrl,
+			],
+			{
+				stdio: ['ignore', 'ignore', 'pipe'],
+			},
+		);
 
 		let bytes = 0;
 		let failed = false;
@@ -199,7 +228,7 @@ async function run(): Promise<void> {
 	console.log('\nDiagnostic complete.');
 }
 
-run().catch((error) => {
+run().catch(error => {
 	console.error('Diagnostic failed:', error);
 	process.exit(1);
 });

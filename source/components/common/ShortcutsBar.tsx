@@ -110,11 +110,14 @@ export default function ShortcutsBar() {
 		if (playerState.radioIsActive) {
 			stopRadio();
 		} else if (playerState.currentTrack) {
-			void startRadio({
-				type: 'track',
-				id: playerState.currentTrack.videoId,
-				name: playerState.currentTrack.title,
-			});
+			void startRadio(
+				{
+					type: 'track',
+					id: playerState.currentTrack.videoId,
+					name: playerState.currentTrack.title,
+				},
+				{playNow: false},
+			);
 		}
 	});
 	// Note: SETTINGS keybinding handled by MainLayout to avoid double-dispatch

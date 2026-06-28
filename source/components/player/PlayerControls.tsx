@@ -139,11 +139,14 @@ export default function PlayerControls() {
 		if (playerState.radioIsActive) {
 			stopRadio();
 		} else if (playerState.currentTrack) {
-			startRadio({
-				type: 'track',
-				id: playerState.currentTrack.videoId,
-				name: playerState.currentTrack.title,
-			});
+			void startRadio(
+				{
+					type: 'track',
+					id: playerState.currentTrack.videoId,
+					name: playerState.currentTrack.title,
+				},
+				{playNow: false},
+			);
 		}
 	});
 

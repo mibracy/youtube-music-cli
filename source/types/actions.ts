@@ -84,6 +84,10 @@ export interface ClearQueueAction {
 	readonly category: 'CLEAR_QUEUE';
 }
 
+export interface ClearQueueAfterCurrentAction {
+	readonly category: 'CLEAR_QUEUE_AFTER_CURRENT';
+}
+
 export interface SetQueuePositionAction {
 	readonly category: 'SET_QUEUE_POSITION';
 	position: number;

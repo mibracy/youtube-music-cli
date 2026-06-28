@@ -32,14 +32,25 @@ export function usePlayer() {
 				}
 			}
 
+			if (state.radioIsActive) {
+				dispatch({
+					category: 'START_RADIO',
+					seed: {
+						type: 'track',
+						id: track.videoId,
+						name: track.title,
+					},
+				});
+			}
+
 			const config = getConfigService();
 			config.addToHistory(track.videoId);
 		},
-		[state.queue, dispatch],
+		[state.queue, state.radioIsActive, dispatch],
 	);
 
 	const startRadio = useCallback(
-		async (seed: RadioSeed) => {
+		async (seed: RadioSeed, options?: {playNow?: boolean}) => {
 			const radioService = getRadioService();
 			const tracks = await radioService.fetchTracksForSeed(seed);
 
@@ -47,20 +58,30 @@ export function usePlayer() {
 				return;
 			}
 
-			dispatch({category: 'CLEAR_QUEUE'});
+			const playNow = options?.playNow ?? true;
+			const canDefer = !playNow && state.currentTrack;
+
+			if (canDefer) {
+				dispatch({category: 'CLEAR_QUEUE_AFTER_CURRENT'});
+			} else {
+				dispatch({category: 'CLEAR_QUEUE'});
+			}
+
 			for (const track of tracks) {
 				dispatch({category: 'ADD_TO_QUEUE', track});
 			}
 
-			const firstTrack = tracks[0];
-			if (firstTrack) {
-				dispatch({category: 'PLAY', track: firstTrack});
-				dispatch({category: 'SET_QUEUE_POSITION', position: 0});
+			if (!canDefer) {
+				const firstTrack = tracks[0];
+				if (firstTrack) {
+					dispatch({category: 'PLAY', track: firstTrack});
+					dispatch({category: 'SET_QUEUE_POSITION', position: 0});
+				}
 			}
 
 			dispatch({category: 'START_RADIO', seed});
 		},
-		[dispatch],
+		[state.currentTrack, dispatch],
 	);
 
 	const stopRadio = useCallback(() => {

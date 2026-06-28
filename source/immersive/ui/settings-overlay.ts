@@ -47,11 +47,7 @@ export function closeSettingsOverlay(state: SettingsOverlayState): void {
 }
 
 export type SettingsInputAction =
-	| 'none'
-	| 'close'
-	| 'cycle'
-	| 'navigate'
-	| 'begin_text';
+	'none' | 'close' | 'cycle' | 'navigate' | 'begin_text';
 
 export function beginSettingsTextEdit(
 	state: SettingsOverlayState,

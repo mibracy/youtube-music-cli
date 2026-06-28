@@ -296,12 +296,7 @@ export function handleSearchResultsMetaKey(
 }
 
 export type SearchResultsAction =
-	| 'none'
-	| 'back'
-	| 'play'
-	| 'mix'
-	| 'favorite'
-	| 'download';
+	'none' | 'back' | 'play' | 'mix' | 'favorite' | 'download';
 
 export function handleSearchResultsInput(
 	state: SearchOverlayState,

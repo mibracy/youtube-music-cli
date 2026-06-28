@@ -74,6 +74,7 @@ export type PlayerAction =
 	| AddToQueueAction
 	| RemoveFromQueueAction
 	| ClearQueueAction
+	| import('./actions.ts').ClearQueueAfterCurrentAction
 	| SetQueuePositionAction
 	| UpdateProgressAction
 	| SetDurationAction

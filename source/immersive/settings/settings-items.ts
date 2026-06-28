@@ -41,9 +41,7 @@ const LLM_ENDPOINTS = [
 ];
 
 export type SettingsTextField =
-	| 'llmApiKey'
-	| 'llmBaseUrl'
-	| 'downloadDirectory';
+	'llmApiKey' | 'llmBaseUrl' | 'downloadDirectory';
 
 export type SettingsRowKind = 'cycle' | 'text' | 'navigate';
 
