@@ -12,6 +12,7 @@ import type {
 } from '../../types/youtube-music.types.ts';
 import type {
 	VideoSearchResult,
+	PlaylistSearchResult,
 	ChannelSearchResult,
 	SearchResponse as YoutubeiSearchResponse,
 } from '../../types/youtubei.types.ts';
@@ -455,8 +456,9 @@ class MusicService {
 				}
 
 				if (searchType === 'all' || searchType === 'playlists') {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const playlists = (search as any).playlists;
+					const playlists = search.playlists as
+						| PlaylistSearchResult[]
+						| undefined;
 					if (playlists) {
 						for (const playlist of playlists) {
 							const id = getItemId(playlist);

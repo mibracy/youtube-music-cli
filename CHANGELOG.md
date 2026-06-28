@@ -1,3 +1,39 @@
+## [0.0.87](https://github.com/involvex/youtube-music-cli/compare/v0.0.86...v0.0.87) (2026-06-27)
+
+## [0.0.86](https://github.com/involvex/youtube-music-cli/compare/v0.0.85...v0.0.86) (2026-06-27)
+
+## [0.0.85](https://github.com/involvex/youtube-music-cli/compare/v0.0.84...v0.0.85) (2026-06-27)
+
+## [0.0.84](https://github.com/involvex/youtube-music-cli/compare/v0.0.83...v0.0.84) (2026-06-27)
+
+## [0.0.83](https://github.com/involvex/youtube-music-cli/compare/v0.0.82...v0.0.83) (2026-06-27)
+
+### Bug Fixes
+
+- **immersive:** rewrite as plain Node.js class to fix black screen ([cf8e16b](https://github.com/involvex/youtube-music-cli/commit/cf8e16b2490441e2f929b7a9b07dd94666c0a392))
+
+## [0.0.82](https://github.com/involvex/youtube-music-cli/compare/v0.0.80...v0.0.82) (2026-06-23)
+
+### Bug Fixes
+
+- replace jiti with native ESM import for plugin loading ([3a07e7e](https://github.com/involvex/youtube-music-cli/commit/3a07e7eb1cee50ee3b41195fc064b5705930ecc0))
+
+### Features
+
+- **immersive:** add Windows immersive TUI mode with visualizer and disco effects ([31ca503](https://github.com/involvex/youtube-music-cli/commit/31ca5039b3392807be84515614c48db89168be50)), closes [hi#DPI](https://github.com/hi/issues/DPI)
+
+## [0.0.80](https://github.com/involvex/youtube-music-cli/compare/v0.0.79...v0.0.80) (2026-06-19)
+
+### Bug Fixes
+
+- **install:** require bun in install scripts to match runtime dependency ([83e1772](https://github.com/involvex/youtube-music-cli/commit/83e177266739426c619701f0859610464556365e)), closes [#27](https://github.com/involvex/youtube-music-cli/issues/27)
+
+### Features
+
+- add Node.js production build support ([ae8b506](https://github.com/involvex/youtube-music-cli/commit/ae8b50658879b5f99b029065a5d1a52c25cd4fd1))
+
+## [0.0.79](https://github.com/involvex/youtube-music-cli/compare/v0.0.78...v0.0.79) (2026-06-15)
+
 ## [0.0.78](https://github.com/involvex/youtube-music-cli/compare/v0.0.77...v0.0.78) (2026-06-06)
 
 ## [0.0.77](https://github.com/involvex/youtube-music-cli/compare/v0.0.76...v0.0.77) (2026-05-16)
