@@ -20,6 +20,7 @@ export type PlayOptions = {
 export type MpvArgsOptions = PlayOptions & {
 	volume: number;
 	subtitlesEnabled?: boolean;
+	idle?: boolean;
 };
 
 export function buildMpvArgs(
@@ -30,6 +31,7 @@ export function buildMpvArgs(
 	const crossfadeDuration = Math.max(0, options.crossfadeDuration ?? 0);
 	const fadeDuration = Math.max(0, options.volumeFadeDuration ?? 0);
 	const eqPreset = options.equalizerPreset ?? 'flat';
+	const idle = options.idle ?? true;
 	const audioFilters: string[] = [];
 
 	if (options.audioNormalization) {
@@ -64,12 +66,15 @@ export function buildMpvArgs(
 		'--really-quiet',
 		'--msg-level=all=error',
 		`--input-ipc-server=${ipcPath}`,
-		'--idle=yes',
 		'--cache=yes',
 		'--cache-secs=30',
 		'--network-timeout=10',
 		`--gapless-audio=${gapless ? 'yes' : 'no'}`,
 	];
+
+	if (idle) {
+		mpvArgs.push('--idle=yes');
+	}
 
 	if (audioFilters.length > 0) {
 		mpvArgs.push(`--af=${audioFilters.join(',')}`);

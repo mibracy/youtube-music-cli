@@ -40,7 +40,8 @@
 		"cli-music"
 	],
 	"workspaces": [
-		"web"
+		"web",
+		"discord-bot"
 	],
 	"scripts": {
 		"prebuild": "bun run format && bun run lint:fix && bun run typecheck",
@@ -91,7 +92,9 @@
 		"meow": "^14.1.0",
 		"node-notifier": "^10.0.1",
 		"node-youtube-music": "^0.10.3",
+		"opusscript": "^0.1.1",
 		"play-sound": "^1.1.6",
+		"playwright": "^1.60.0",
 		"react": "^19.2.7",
 		"ws": "^8.21.0",
 		"youtube-ext": "^1.1.25",

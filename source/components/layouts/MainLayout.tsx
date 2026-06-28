@@ -97,8 +97,10 @@ function MainLayout() {
 	}, [navState.currentView, dispatch]);
 
 	const goToLyrics = useCallback(() => {
-		dispatch({category: 'NAVIGATE', view: VIEW.LYRICS});
-	}, [dispatch]);
+		if (navState.currentView !== VIEW.LYRICS) {
+			dispatch({category: 'NAVIGATE', view: VIEW.LYRICS});
+		}
+	}, [dispatch, navState.currentView]);
 
 	const goToTrending = useCallback(() => {
 		dispatch({category: 'NAVIGATE', view: VIEW.TRENDING});
