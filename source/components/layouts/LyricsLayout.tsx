@@ -160,7 +160,8 @@ export default function LyricsLayout() {
 
 			<Box marginTop={1}>
 				<Text color={theme.colors.dim}>
-					Press <Text color={theme.colors.text}>l</Text> or{' '}
+					Press <Text color={theme.colors.text}>q</Text> to quit,{' '}
+					<Text color={theme.colors.text}>l</Text> or{' '}
 					<Text color={theme.colors.text}>Esc</Text> to go back
 				</Text>
 			</Box>

@@ -88,8 +88,11 @@ function MainLayout() {
 	}, [dispatch, navState.currentView]);
 
 	const handleQuit = useCallback(() => {
-		// From player view, quit the app
-		if (navState.currentView === VIEW.PLAYER) {
+		// From player or lyrics view, quit the app
+		if (
+			navState.currentView === VIEW.PLAYER ||
+			navState.currentView === VIEW.LYRICS
+		) {
 			process.exit(0);
 		}
 		// From other views, go back
