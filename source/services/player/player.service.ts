@@ -85,7 +85,7 @@ export function buildMpvArgs(
 	}
 
 	if (options.subtitlesEnabled) {
-		mpvArgs.push('--sub-lang=en', '--sub-scale=1.3');
+		mpvArgs.push('--slang=en', '--sub-scale=1.3');
 	}
 
 	return mpvArgs;
@@ -180,6 +180,7 @@ class PlayerService {
 	private pendingIpcTimers: ReturnType<typeof setTimeout>[] = [];
 	private currentTrackId: string | null = null; // Track currently playing
 	private playSessionId = 0; // Incremented per play() call for unique IPC paths
+	private playGeneration = 0; // Invalidates stale play() promises when stop() kills mpv
 	private lastVolumeChangeTimestamp = 0; // For correlating volume changes with pause events
 
 	private constructor() {}
@@ -597,6 +598,7 @@ class PlayerService {
 
 		// Increment session ID for a unique IPC socket path per play call
 		this.playSessionId++;
+		const playGeneration = ++this.playGeneration;
 
 		// Generate IPC socket path
 		this.ipcPath = this.getIpcPath();
@@ -634,16 +636,19 @@ class PlayerService {
 
 				this.isPlaying = true;
 				let isResolved = false;
+				let mpvStderr = '';
+
+				const isStalePlay = () => playGeneration !== this.playGeneration;
 
 				const handleSuccess = () => {
-					if (!isResolved) {
+					if (!isResolved && !isStalePlay()) {
 						isResolved = true;
 						resolve();
 					}
 				};
 
 				const handleError = (err: Error) => {
-					if (!isResolved) {
+					if (!isResolved && !isStalePlay()) {
 						isResolved = true;
 						reject(err);
 					}
@@ -679,6 +684,7 @@ class PlayerService {
 				spawnedProcess.stderr.on('data', (data: Buffer) => {
 					const error = data.toString().trim();
 					if (error) {
+						mpvStderr = mpvStderr ? `${mpvStderr}\n${error}` : error;
 						logger.error('PlayerService', 'mpv stderr', {error});
 					}
 				});
@@ -689,7 +695,12 @@ class PlayerService {
 						code,
 						signal,
 						wasPlaying: this.isPlaying,
+						stale: isStalePlay(),
 					});
+
+					if (isStalePlay()) {
+						return;
+					}
 
 					// Only update shared state if this is still the active process
 					if (this.mpvProcess === spawnedProcess) {
@@ -701,8 +712,8 @@ class PlayerService {
 						// Normal exit (track finished)
 						handleSuccess();
 					} else if (code !== null && code > 0) {
-						// Error exit
-						handleError(new Error(`mpv exited with code ${code}`));
+						const stderrHint = mpvStderr ? `: ${mpvStderr}` : '';
+						handleError(new Error(`mpv exited with code ${code}${stderrHint}`));
 					}
 					// If killed by signal, don't reject (user stopped it)
 				});
@@ -712,6 +723,10 @@ class PlayerService {
 					logger.error('PlayerService', 'mpv process error', {
 						...formatErrorData(error),
 					});
+					if (isStalePlay()) {
+						return;
+					}
+
 					if (this.mpvProcess === spawnedProcess) {
 						this.isPlaying = false;
 						this.mpvProcess = null;
@@ -788,6 +803,7 @@ class PlayerService {
 		});
 
 		this.invalidateIpcConnect();
+		this.playGeneration++;
 		this.destroyIpcSocket();
 
 		if (this.mpvProcess) {
