@@ -2,7 +2,6 @@
 import type {ToolResult} from '../../types/llm.types.ts';
 import {getMusicService} from '../youtube-music/api.ts';
 import {getConfigService} from '../config/config.service.ts';
-import {loadFavorites} from '../favorites/favorites.service.ts';
 import {logger} from '../logger/logger.service.ts';
 
 type ToolArgs = Record<string, unknown>;
@@ -169,17 +168,8 @@ export async function executeTool(
 			}
 
 			case 'get_user_favorites': {
-				const favorites = await loadFavorites();
-				return {
-					success: true,
-					data: {
-						favorites: favorites.map(track => ({
-							id: track.videoId,
-							title: track.title,
-							artist: track.artists[0]?.name,
-						})),
-					},
-				};
+				const favorites = configService.get('favorites') || [];
+				return {success: true, data: {favorites: favorites as string[]}};
 			}
 
 			case 'start_radio': {

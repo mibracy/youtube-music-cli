@@ -249,6 +249,7 @@ youtube-music-cli --win32            # Windows immersive mode (Bun native)
 - `@bun-win32/*` major upgrades must bump user32 and kernel32 together (shared `@bun-win32/core` 2.x); `@bun-win32/combase` and `@bun-win32/shell32` are not used
 - Run immersive AVA tests with `--timeout=60s` — default 30s can timeout when heavy modules load
 - Ink TUI and immersive share favorites via `getFavoritesManager()` in `source/services/favorites/favorites.service.ts`, persisting to `~/.youtube-music-cli/favorites.json` (`schemaVersion` + `tracks` + `lastUpdated`); do not write favorites before hydration completes
+- Favorites video IDs are also retained in `config.json` as a backup; migration to `favorites.json` only happens when `favorites.json` is missing/empty and never drops config favorites
 - mpv 0.41+ subtitle language uses `--slang=en` in `buildMpvArgs`, not `--sub-lang=en` — the old flag makes mpv exit immediately when subtitles are enabled
 - `PlayerService` uses `playGeneration` to invalidate stale `play()` promises after `stop()`, `isValidIpcPipePath()` for Windows pipe paths, and aborts stale IPC connect retries on stop
 - `SET_ERROR` in `player.store.tsx` sets both `isLoading: false` and `isPlaying: false` so the UI does not show playing after a playback failure

@@ -1,26 +1,20 @@
-import {
-	copyFile,
-	mkdir,
-	readFile,
-	rename,
-	unlink,
-	writeFile,
-} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {join} from 'node:path';
 import {CONFIG_DIR} from '../../utils/constants.ts';
 import {formatError} from '../../utils/error.ts';
-import type {PersistedFavorites} from '../../types/favorites.types.ts';
+import {logger} from '../logger/logger.service.ts';
 import type {Track} from '../../types/youtube-music.types.ts';
 import {getConfigService} from '../config/config.service.ts';
-import {logger} from '../logger/logger.service.ts';
 
-let favoritesFilePathOverride: string | null = null;
-
-function getFavoritesFilePath(): string {
-	return favoritesFilePathOverride ?? join(CONFIG_DIR, 'favorites.json');
-}
+const FAVORITES_FILE = join(CONFIG_DIR, 'favorites.json');
 const SCHEMA_VERSION = 1;
+
+export interface PersistedFavorites {
+	schemaVersion: number;
+	tracks: Track[];
+	lastUpdated: string;
+}
 
 const defaultFavorites: PersistedFavorites = {
 	schemaVersion: SCHEMA_VERSION,
@@ -28,66 +22,87 @@ const defaultFavorites: PersistedFavorites = {
 	lastUpdated: new Date().toISOString(),
 };
 
-function isPersistedTrack(value: unknown): value is Track {
-	if (!value || typeof value !== 'object') {
-		return false;
-	}
+let saveLock = Promise.resolve();
+let favoritesFilePathOverride: string | null = null;
 
-	const track = value as Track;
-	return (
-		typeof track.videoId === 'string' &&
-		track.videoId.length > 0 &&
-		typeof track.title === 'string' &&
-		track.title.length > 0 &&
-		Array.isArray(track.artists)
-	);
+function getFavoritesFilePath(): string {
+	return favoritesFilePathOverride ?? FAVORITES_FILE;
 }
 
-export function parseFavoritesFileContent(data: unknown): Track[] {
-	if (Array.isArray(data)) {
-		return data.filter(isPersistedTrack);
-	}
-
-	if (!data || typeof data !== 'object') {
-		return [];
-	}
-
-	const persisted = data as Partial<PersistedFavorites>;
-	if (!Array.isArray(persisted.tracks)) {
-		return [];
-	}
-
-	if (
-		persisted.schemaVersion !== undefined &&
-		persisted.schemaVersion !== SCHEMA_VERSION
-	) {
-		logger.warn(
-			'FavoritesService',
-			'Schema version mismatch, migrating tracks',
-			{
-				expected: SCHEMA_VERSION,
-				found: persisted.schemaVersion,
-			},
-		);
-	}
-
-	return persisted.tracks.filter(isPersistedTrack);
-}
-
-function tracksFromLegacyIds(ids: string[]): Track[] {
-	return ids.map(videoId => ({
+function trackFromLegacyId(videoId: string): Track {
+	return {
 		videoId,
 		title: videoId,
 		artists: [],
-	}));
+	};
 }
 
-let saveLock = Promise.resolve();
+async function migrateLegacyConfigFavoritesSafely(): Promise<Track[]> {
+	const configService = getConfigService();
+	const legacyIds = configService.getLegacyFavoriteIds();
 
-export async function saveFavorites(
-	tracks: Track[],
-	options?: {allowEmptyOverwrite?: boolean},
-): Promise<void> {
+	if (legacyIds.length === 0) {
+		return [];
+	}
+
+	const existing = await loadFavoritesWithoutMigration();
+	if (existing.length > 0) {
+		logger.info(
+			'FavoritesService',
+			'Keeping existing favorites.json; skipping legacy config migration',
+			{existingCount: existing.length, legacyCount: legacyIds.length},
+		);
+		return existing;
+	}
+
+	const tracks = legacyIds.map(trackFromLegacyId);
+	logger.info('FavoritesService', 'Migrated legacy config favorites safely', {
+		count: tracks.length,
+	});
+	await saveFavorites(tracks);
+	return tracks;
+}
+
+async function loadFavoritesWithoutMigration(): Promise<Track[]> {
+	const favoritesFile = getFavoritesFilePath();
+
+	try {
+		if (!existsSync(favoritesFile)) {
+			logger.debug('FavoritesService', 'No favorites file found');
+			return [];
+		}
+
+		const data = await readFile(favoritesFile, 'utf8');
+		const persisted = JSON.parse(data) as PersistedFavorites;
+
+		if (persisted.schemaVersion !== SCHEMA_VERSION) {
+			logger.warn('FavoritesService', 'Schema version mismatch', {
+				expected: SCHEMA_VERSION,
+				found: persisted.schemaVersion,
+			});
+			return [];
+		}
+
+		if (!Array.isArray(persisted.tracks)) {
+			logger.warn('FavoritesService', 'Invalid favorites format, resetting');
+			return [];
+		}
+
+		logger.info('FavoritesService', 'Loaded favorites', {
+			count: persisted.tracks.length,
+			lastUpdated: persisted.lastUpdated,
+		});
+
+		return persisted.tracks;
+	} catch (error) {
+		logger.error('FavoritesService', 'Failed to load favorites', {
+			error: formatError(error),
+		});
+		return [];
+	}
+}
+
+export async function saveFavorites(tracks: Track[]): Promise<void> {
 	const favoritesFile = getFavoritesFilePath();
 	const currentLock = saveLock;
 	let releaseLock: () => void = () => {};
@@ -99,32 +114,8 @@ export async function saveFavorites(
 	await currentLock.catch(() => {});
 
 	try {
-		const favoritesDir = join(favoritesFile, '..');
-		if (!existsSync(favoritesDir)) {
-			await mkdir(favoritesDir, {recursive: true});
-		}
-
-		if (
-			tracks.length === 0 &&
-			!options?.allowEmptyOverwrite &&
-			existsSync(favoritesFile)
-		) {
-			try {
-				const existingData = await readFile(favoritesFile, 'utf8');
-				const existingTracks = parseFavoritesFileContent(
-					JSON.parse(existingData) as unknown,
-				);
-				if (existingTracks.length > 0) {
-					logger.warn(
-						'FavoritesService',
-						'Refusing to overwrite non-empty favorites file with empty list',
-						{existingCount: existingTracks.length},
-					);
-					return;
-				}
-			} catch {
-				/* allow empty overwrite when existing file is unreadable */
-			}
+		if (!existsSync(CONFIG_DIR)) {
+			await mkdir(CONFIG_DIR, {recursive: true});
 		}
 
 		const stateToSave: PersistedFavorites = {
@@ -134,40 +125,15 @@ export async function saveFavorites(
 		};
 
 		const tempFile = `${favoritesFile}.tmp.${Date.now()}`;
-		const backupFile = `${favoritesFile}.bak`;
 		await writeFile(tempFile, JSON.stringify(stateToSave, null, 2), 'utf8');
 
-		try {
-			if (existsSync(favoritesFile)) {
-				await copyFile(favoritesFile, backupFile);
-			}
-
-			try {
-				await rename(tempFile, favoritesFile);
-			} catch {
-				if (process.platform === 'win32' && existsSync(favoritesFile)) {
-					await unlink(favoritesFile);
-				}
-
-				await rename(tempFile, favoritesFile);
-			}
-
-			if (existsSync(backupFile)) {
-				await unlink(backupFile);
-			}
-		} catch (error) {
-			if (existsSync(backupFile)) {
-				try {
-					await copyFile(backupFile, favoritesFile);
-				} catch {
-					/* ignore restore failure */
-				}
-
-				await unlink(backupFile).catch(() => {});
-			}
-
-			throw error;
+		if (process.platform === 'win32' && existsSync(favoritesFile)) {
+			await import('node:fs/promises').then(fs => fs.unlink(favoritesFile));
 		}
+
+		await import('node:fs/promises').then(fs =>
+			fs.rename(tempFile, favoritesFile),
+		);
 
 		logger.debug('FavoritesService', 'Saved favorites', {
 			count: tracks.length,
@@ -182,48 +148,15 @@ export async function saveFavorites(
 }
 
 export async function loadFavorites(): Promise<Track[]> {
-	const favoritesFile = getFavoritesFilePath();
+	const tracks = await loadFavoritesWithoutMigration();
 
-	try {
-		if (!existsSync(favoritesFile)) {
-			logger.debug('FavoritesService', 'No favorites file found');
-			return [];
+	if (tracks.length === 0) {
+		const migrated = await migrateLegacyConfigFavoritesSafely();
+		if (migrated.length > 0) {
+			return migrated;
 		}
-
-		const data = await readFile(favoritesFile, 'utf8');
-		const parsed = JSON.parse(data) as unknown;
-		const tracks = parseFavoritesFileContent(parsed);
-
-		if (tracks.length === 0 && data.trim() !== '' && data.trim() !== '[]') {
-			logger.warn('FavoritesService', 'Favorites file had no valid tracks', {
-				bytes: data.length,
-			});
-		}
-
-		logger.info('FavoritesService', 'Loaded favorites', {
-			count: tracks.length,
-		});
-
-		return tracks;
-	} catch (error) {
-		logger.error('FavoritesService', 'Failed to load favorites', {
-			error: formatError(error),
-		});
-		return [];
-	}
-}
-
-async function migrateLegacyConfigFavorites(): Promise<Track[]> {
-	const legacyIds = getConfigService().consumeLegacyFavoriteIds();
-	if (legacyIds.length === 0) {
-		return [];
 	}
 
-	const tracks = tracksFromLegacyIds(legacyIds);
-	logger.info('FavoritesService', 'Migrated legacy config favorites', {
-		count: tracks.length,
-	});
-	await saveFavorites(tracks);
 	return tracks;
 }
 
@@ -242,24 +175,7 @@ export class FavoritesManager {
 	}
 
 	private async loadFromDisk(): Promise<void> {
-		const favoritesFile = getFavoritesFilePath();
-		const favoritesFileExisted = existsSync(favoritesFile);
-
 		this.tracks = await loadFavorites();
-		if (this.tracks.length === 0) {
-			if (!favoritesFileExisted) {
-				this.tracks = await migrateLegacyConfigFavorites();
-			} else {
-				getConfigService().consumeLegacyFavoriteIds();
-				logger.warn(
-					'FavoritesService',
-					'Favorites file exists but contained no valid tracks; keeping file on disk',
-				);
-			}
-		} else {
-			getConfigService().consumeLegacyFavoriteIds();
-		}
-
 		this.loaded = true;
 	}
 
@@ -293,7 +209,7 @@ export class FavoritesManager {
 		}
 
 		this.tracks = next;
-		await saveFavorites(this.tracks, {allowEmptyOverwrite: true});
+		await saveFavorites(this.tracks);
 	}
 
 	async toggle(track: Track): Promise<boolean> {
