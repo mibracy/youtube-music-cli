@@ -90,14 +90,28 @@ export default function NewReleasesLayout() {
 		};
 	}, [genreIndex, genres]);
 
-	const MAX_RELEASES = 42;
+	const VISIBLE_COUNT = 42;
 
 	const currentReleases =
 		genreIndex === 0
 			? sections.flatMap(s => s.releases)
 			: genreReleases;
 
-	const displayReleases = currentReleases.slice(0, MAX_RELEASES);
+	const halfWindow = Math.floor(VISIBLE_COUNT / 2);
+	const sliceStart = Math.max(
+		0,
+		Math.min(
+			releaseIndex - halfWindow,
+			Math.max(0, currentReleases.length - VISIBLE_COUNT),
+		),
+	);
+	const windowedReleases = currentReleases.slice(
+		sliceStart,
+		sliceStart + VISIBLE_COUNT,
+	);
+	const hasMoreAbove = sliceStart > 0;
+	const hasMoreBelow =
+		sliceStart + VISIBLE_COUNT < currentReleases.length;
 
 	const allLabels = ['All', ...genres.map(g => g.title)];
 
@@ -123,10 +137,10 @@ export default function NewReleasesLayout() {
 			setReleaseIndex(i => Math.max(0, i - 1));
 		} else if (key.downArrow || input === 'j') {
 			setReleaseIndex(i =>
-				Math.min(displayReleases.length - 1, i + 1),
+				Math.min(currentReleases.length - 1, i + 1),
 			);
 		} else if (key.return) {
-			const release = displayReleases[releaseIndex];
+			const release = currentReleases[releaseIndex];
 			if (release?.browseId) {
 				setIsLoading(true);
 				void getMusicService()
@@ -191,14 +205,22 @@ export default function NewReleasesLayout() {
 				<Text color={theme.colors.dim}>Loading...</Text>
 			) : error ? (
 				<Text color={theme.colors.error}>{error}</Text>
-			) : displayReleases.length === 0 ? (
+			) : currentReleases.length === 0 ? (
 				<Text color={theme.colors.dim}>No releases found</Text>
 			) : (
 				<Box flexDirection="column">
-					{displayReleases.map((release, index) => {
-						const isSelected = index === releaseIndex;
+					{hasMoreAbove && (
+						<Text color={theme.colors.dim}>··</Text>
+					)}
+					{windowedReleases.map((release, i) => {
+						const absoluteIndex = sliceStart + i;
+						const isSelected = absoluteIndex === releaseIndex;
 						return (
-							<Box key={release.browseId + String(index)}>
+							<Box
+								key={
+									release.browseId + String(absoluteIndex)
+								}
+							>
 								<Text
 									color={
 										isSelected
@@ -208,7 +230,7 @@ export default function NewReleasesLayout() {
 								>
 									{isSelected
 										? '▶ '
-										: `${String(index + 1).padStart(2)}. `}
+										: `${String(absoluteIndex + 1).padStart(2)}. `}
 								</Text>
 								<Text
 									color={
@@ -227,6 +249,9 @@ export default function NewReleasesLayout() {
 							</Box>
 						);
 					})}
+					{hasMoreBelow && (
+						<Text color={theme.colors.dim}>··</Text>
+					)}
 				</Box>
 			)}
 
