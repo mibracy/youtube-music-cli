@@ -4,6 +4,7 @@ import {
 	useEffect,
 	useMemo,
 	useReducer,
+	useRef,
 	type ReactNode,
 } from 'react';
 import type {Track} from '../types/youtube-music.types.ts';
@@ -51,16 +52,19 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({children}: {children: ReactNode}) {
 	const [state, dispatch] = useReducer(favoritesReducer, []);
+	const isInitializedRef = useRef(false);
 
 	// Load favorites on mount
 	useEffect(() => {
 		void loadFavorites().then(tracks => {
 			dispatch({category: 'SET_FAVORITES', tracks});
+			isInitializedRef.current = true;
 		});
 	}, []);
 
-	// Save favorites on change
+	// Save favorites on change (only after initial load completes)
 	useEffect(() => {
+		if (!isInitializedRef.current) return;
 		void saveFavorites(state);
 	}, [state]);
 

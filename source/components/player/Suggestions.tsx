@@ -38,7 +38,7 @@ export default function Suggestions() {
 	const playSelected = useCallback(() => {
 		const track = suggestions[selectedIndex];
 		if (track) {
-			play(track);
+			play(track, {clearQueue: true});
 		}
 	}, [selectedIndex, suggestions, play]);
 

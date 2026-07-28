@@ -109,8 +109,15 @@ export function playerReducer(
 				};
 			}
 
+			// If the current track isn't in the queue (standalone play),
+			// advance to the first track in the queue instead of skipping it
+			const currentInQueue = state.queue.some(
+				t => t.videoId === state.currentTrack?.videoId,
+			);
+			const basePosition = currentInQueue ? state.queuePosition : -1;
+
 			// Sequential mode
-			const nextPosition = state.queuePosition + 1;
+			const nextPosition = basePosition + 1;
 			if (nextPosition >= state.queue.length) {
 				if (state.repeat === 'all') {
 					return {
@@ -348,7 +355,7 @@ import type {Track} from '../types/youtube-music.types.ts';
 type PlayerContextValue = {
 	state: PlayerState;
 	dispatch: (action: PlayerAction) => void;
-	play: (track: Track) => void;
+	play: (track: Track, options?: {clearQueue?: boolean}) => void;
 	pause: () => void;
 	resume: () => void;
 	stop: () => void;
@@ -802,6 +809,13 @@ function PlayerManager() {
 			return;
 		}
 
+		// Don't fetch suggestions when playing through a queue (playlist, etc.)
+		// Only fetch for standalone tracks not part of the queue
+		const trackInQueue = state.queue.some(
+			t => t.videoId === state.currentTrack?.videoId,
+		);
+		if (trackInQueue) return;
+
 		// In radio mode, fetch more aggressively (when ≤15 tracks ahead)
 		// In regular autoplay, only fetch when ≤5 tracks ahead
 		const tracksAheadThreshold = state.radioIsActive ? 15 : 5;
@@ -883,7 +897,7 @@ function PlayerManager() {
 		state.isPlaying,
 		state.repeat,
 		state.shuffle,
-		state.queue.length,
+		state.queue,
 		state.queuePosition,
 		state.radioIsActive,
 		state.radioSeed,
@@ -1043,7 +1057,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 
 	const actions = useMemo(
 		() => ({
-			play: (track: Track) => {
+			play: (track: Track, _options?: {clearQueue?: boolean}) => {
 				logger.info('PlayerProvider', 'play() action dispatched', {
 					title: track.title,
 					videoId: track.videoId,

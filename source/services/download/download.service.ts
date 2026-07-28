@@ -226,7 +226,7 @@ class DownloadService {
 		directory: string,
 		format: DownloadFormat,
 	): string {
-		const artist = track.artists[0]?.name ?? 'Unknown Artist';
+		const artist = track.artists?.[0]?.name ?? 'Unknown Artist';
 		const album = track.album?.name ?? 'Singles';
 		const artistDir = this.sanitizeFilename(artist) || 'Unknown Artist';
 		const albumDir = this.sanitizeFilename(album) || 'Singles';

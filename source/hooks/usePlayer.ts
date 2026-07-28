@@ -13,7 +13,6 @@ export function usePlayer() {
 		(track: Track, options?: {clearQueue?: boolean}) => {
 			if (options?.clearQueue) {
 				dispatch({category: 'CLEAR_QUEUE'});
-				dispatch({category: 'ADD_TO_QUEUE', track});
 				dispatch({category: 'PLAY', track});
 			} else {
 				const isInQueue = state.queue.some(t => t.videoId === track.videoId);

@@ -46,7 +46,11 @@ export default function TrendingLayout() {
 			return;
 		}
 
-		if ((key.upArrow || input === 'k') && throttleArrowKey()) return;
+		if (
+			(key.upArrow || input === 'k' || key.downArrow || input === 'j') &&
+			throttleArrowKey()
+		)
+			return;
 
 		if (key.upArrow || input === 'k') {
 			setSelectedIndex(i => Math.max(0, i - 1));
@@ -54,7 +58,7 @@ export default function TrendingLayout() {
 			setSelectedIndex(i => Math.min(tracks.length - 1, i + 1));
 		} else if (key.return) {
 			const track = tracks[selectedIndex];
-			if (track) play(track);
+			if (track) play(track, {clearQueue: true});
 		}
 	});
 

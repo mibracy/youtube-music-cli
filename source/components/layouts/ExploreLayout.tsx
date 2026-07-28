@@ -73,7 +73,7 @@ export default function ExploreLayout() {
 			setTrackIndex(i => Math.min(tracks.length - 1, i + 1));
 		} else if (key.return) {
 			const track = tracks[trackIndex];
-			if (track) play(track);
+			if (track) play(track, {clearQueue: true});
 		}
 	});
 

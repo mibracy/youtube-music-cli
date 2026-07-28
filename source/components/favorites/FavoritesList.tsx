@@ -28,7 +28,7 @@ export default function FavoritesList() {
 	const playSelected = useCallback(() => {
 		const track = favorites[selectedIndex];
 		if (track) {
-			play(track);
+			play(track, {clearQueue: true});
 		}
 	}, [favorites, selectedIndex, play]);
 
