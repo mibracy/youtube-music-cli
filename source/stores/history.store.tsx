@@ -43,12 +43,14 @@ export function HistoryProvider({children}: {children: ReactNode}) {
 	const [state, dispatch] = useReducer(historyReducer, []);
 	const {state: playerState} = usePlayer();
 	const lastLoggedId = useRef<string | null>(null);
+	const isInitializedRef = useRef(false);
 
 	useEffect(() => {
 		let cancelled = false;
 		void loadHistory().then(entries => {
 			if (!cancelled) {
 				dispatch({category: 'SET_HISTORY', entries});
+				isInitializedRef.current = true;
 			}
 		});
 		return () => {
@@ -81,6 +83,7 @@ export function HistoryProvider({children}: {children: ReactNode}) {
 	}, [playerState.currentTrack, playerState.isPlaying]);
 
 	useEffect(() => {
+		if (!isInitializedRef.current) return;
 		void saveHistory(state);
 	}, [state]);
 

@@ -1,6 +1,6 @@
 // Home / Startup screen component
-import {Box, Text} from 'ink';
-import {useState, useEffect} from 'react';
+import {Box, Text, useInput} from 'ink';
+import {useState, useEffect, useCallback} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {useHistory} from '../../stores/history.store.tsx';
@@ -18,6 +18,9 @@ import {ICONS} from '../../utils/icons.ts';
 import {getMusicService} from '../../services/youtube-music/api.ts';
 import {type Track} from '../../types/youtube-music.types.ts';
 
+type TabId = 'quicklinks' | 'recentlyplayed' | 'favorites';
+const TAB_ORDER: TabId[] = ['quicklinks', 'recentlyplayed', 'favorites'];
+
 export default function HomeLayout() {
 	const {theme} = useTheme();
 	const {dispatch} = useNavigation();
@@ -26,7 +29,12 @@ export default function HomeLayout() {
 	const {state: playerState, play} = usePlayer();
 	const {columns, rows} = useTerminalSize();
 
-	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [activeTab, setActiveTab] = useState<TabId>('quicklinks');
+	const [tabIndices, setTabIndices] = useState<Record<TabId, number>>({
+		quicklinks: 0,
+		recentlyplayed: 0,
+		favorites: 0,
+	});
 	const [quitState, setQuitState] = useState(getQuitSequence);
 
 	useEffect(() => subscribeToQuitSequence(setQuitState), []);
@@ -92,10 +100,6 @@ export default function HomeLayout() {
 	];
 
 	// Calculate how many items fit per section based on terminal height
-	// Header: double border = 3 rows (top, text, bottom)
-	// Progress bar: round border = 4 rows (top, currently playing, progress, bottom) — only when track is playing
-	// Footer: bordered = 3 rows (top, text, bottom), no border = 1 row
-	// Each section: round border + title = 3 rows overhead per section
 	const headerRows = 3;
 	const progressRows = playerState.currentTrack ? 4 : 0;
 	const footerRows = rows >= 25 ? 3 : 1;
@@ -112,38 +116,81 @@ export default function HomeLayout() {
 	const recentHistory = history.slice(0, itemsPerSection + 5);
 	const recentFavorites = favorites.slice(0, itemsPerSection);
 
-	const totalItems =
-		quickLinks.length + recentHistory.length + recentFavorites.length;
+	const maxTitleLength = Math.max(20, columns - 40);
 
-	const handleSelect = () => {
-		if (shouldHideMenus) return;
-		if (selectedIndex < quickLinks.length) {
-			const link = quickLinks[selectedIndex]!;
-			if (link.action) {
-				link.action();
-			} else {
-				dispatch({category: 'NAVIGATE', view: link.view});
-			}
-		} else if (selectedIndex < quickLinks.length + recentHistory.length) {
-			const entry = recentHistory[selectedIndex - quickLinks.length];
-			if (entry) play(entry.track, {clearQueue: true});
-		} else {
-			const track =
-				recentFavorites[
-					selectedIndex - quickLinks.length - recentHistory.length
-				];
-			if (track) play(track, {clearQueue: true});
+	const getTabMaxIndex = (tab: TabId) => {
+		switch (tab) {
+			case 'quicklinks':
+				return quickLinks.length - 1;
+			case 'recentlyplayed':
+				return Math.max(0, recentHistory.length - 1);
+			case 'favorites':
+				return Math.max(0, recentFavorites.length - 1);
+			default:
+				return 0;
 		}
 	};
 
+	const cycleTab = useCallback((direction: 1 | -1) => {
+		setActiveTab(prev => {
+			const currentIndex = TAB_ORDER.indexOf(prev);
+			const nextIndex =
+				(currentIndex + direction + TAB_ORDER.length) % TAB_ORDER.length;
+			return TAB_ORDER[nextIndex]!;
+		});
+	}, []);
+
+	const handleSelect = useCallback(() => {
+		if (shouldHideMenus) return;
+		const idx = tabIndices[activeTab];
+
+		if (activeTab === 'quicklinks') {
+			const link = quickLinks[idx];
+			if (link) {
+				if (link.action) {
+					link.action();
+				} else {
+					dispatch({category: 'NAVIGATE', view: link.view});
+				}
+			}
+		} else if (activeTab === 'recentlyplayed') {
+			const entry = recentHistory[idx];
+			if (entry) play(entry.track, {clearQueue: true});
+		} else if (activeTab === 'favorites') {
+			const track = recentFavorites[idx];
+			if (track) play(track, {clearQueue: true});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		activeTab,
+		tabIndices,
+		shouldHideMenus,
+		recentHistory,
+		recentFavorites,
+		play,
+		dispatch,
+	]);
+
 	useKeyBinding(KEYBINDINGS.UP, () => {
 		if (shouldHideMenus) return;
-		setSelectedIndex(prev => Math.max(0, prev - 1));
+		setTabIndices(prev => {
+			const max = getTabMaxIndex(activeTab);
+			return {
+				...prev,
+				[activeTab]: prev[activeTab] <= 0 ? max : prev[activeTab] - 1,
+			};
+		});
 	});
 
 	useKeyBinding(KEYBINDINGS.DOWN, () => {
 		if (shouldHideMenus) return;
-		setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
+		setTabIndices(prev => {
+			const max = getTabMaxIndex(activeTab);
+			return {
+				...prev,
+				[activeTab]: prev[activeTab] >= max ? 0 : prev[activeTab] + 1,
+			};
+		});
 	});
 
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
@@ -157,7 +204,12 @@ export default function HomeLayout() {
 		}
 	});
 
-	const maxTitleLength = Math.max(20, columns - 40);
+	useInput((_input, key) => {
+		if (shouldHideMenus) return;
+		if (key.tab) {
+			cycleTab(key.shift ? -1 : 1);
+		}
+	});
 
 	// Progress bar calculation
 	const progress = Math.max(
@@ -172,6 +224,16 @@ export default function HomeLayout() {
 	// Extract artist string from current track
 	const currentTrackArtists =
 		playerState.currentTrack?.artists?.map(a => a.name).join(', ') ?? '';
+
+	const renderTabHeader = (label: string) => {
+		return (
+			<Box marginBottom={0}>
+				<Text bold color={theme.colors.secondary}>
+					{label}
+				</Text>
+			</Box>
+		);
+	};
 
 	return (
 		<Box
@@ -202,31 +264,33 @@ export default function HomeLayout() {
 						flexDirection="column"
 						width="25%"
 						borderStyle="round"
-						borderColor={theme.colors.dim}
+						borderColor={
+							activeTab === 'quicklinks'
+								? theme.colors.primary
+								: theme.colors.dim
+						}
 						paddingX={1}
 					>
-						<Box marginBottom={0}>
-							<Text bold color={theme.colors.secondary}>
-								Quick Links
-							</Text>
-						</Box>
-						{quickLinks.map((link, index) => (
-							<Box key={link.label}>
-								<Text
-									backgroundColor={
-										selectedIndex === index ? theme.colors.primary : undefined
-									}
-									color={
-										selectedIndex === index
-											? theme.colors.background
-											: theme.colors.text
-									}
-								>
-									{selectedIndex === index ? '> ' : '  '}
-									{link.label}
-								</Text>
-							</Box>
-						))}
+						{renderTabHeader('Quick Links')}
+						{quickLinks.map((link, index) => {
+							const isSelected =
+								activeTab === 'quicklinks' && tabIndices.quicklinks === index;
+							return (
+								<Box key={link.label}>
+									<Text
+										backgroundColor={
+											isSelected ? theme.colors.primary : undefined
+										}
+										color={
+											isSelected ? theme.colors.background : theme.colors.text
+										}
+									>
+										{isSelected ? '> ' : '  '}
+										{link.label}
+									</Text>
+								</Box>
+							);
+						})}
 					</Box>
 
 					{/* Right Column: Activity */}
@@ -237,37 +301,39 @@ export default function HomeLayout() {
 							flexGrow={1}
 							minHeight={0}
 							borderStyle="round"
-							borderColor={theme.colors.dim}
+							borderColor={
+								activeTab === 'recentlyplayed'
+									? theme.colors.primary
+									: theme.colors.dim
+							}
 							paddingX={1}
 						>
-							<Text bold color={theme.colors.secondary}>
-								🕒 Recently Played
-							</Text>
+							{renderTabHeader('🕒 Recently Played')}
 							{recentHistory.length === 0 ? (
 								<Text color={theme.colors.dim}> No history yet</Text>
 							) : (
 								recentHistory.map((entry, index) => {
-									const actualIndex = index + quickLinks.length;
+									const isSelected =
+										activeTab === 'recentlyplayed' &&
+										tabIndices.recentlyplayed === index;
 									return (
 										<Box key={`${entry.playedAt}-${entry.track.videoId}`}>
 											<Text
 												backgroundColor={
-													selectedIndex === actualIndex
-														? theme.colors.primary
-														: undefined
+													isSelected ? theme.colors.primary : undefined
 												}
 												color={
-													selectedIndex === actualIndex
+													isSelected
 														? theme.colors.background
 														: theme.colors.text
 												}
 											>
-												{selectedIndex === actualIndex ? '> ' : '  '}
+												{isSelected ? '> ' : '  '}
 												{truncate(entry.track.title, maxTitleLength)}
 											</Text>
 											<Text color={theme.colors.dim} wrap="truncate">
 												{' '}
-												- {entry.track.artists[0]?.name}
+												- {entry.track.artists?.[0]?.name}
 											</Text>
 										</Box>
 									);
@@ -275,18 +341,20 @@ export default function HomeLayout() {
 							)}
 						</Box>
 
-						{/* Top Favorites */}
+						{/* Favorites */}
 						<Box
 							flexDirection="column"
 							flexGrow={1}
 							minHeight={0}
 							borderStyle="round"
-							borderColor={theme.colors.dim}
+							borderColor={
+								activeTab === 'favorites'
+									? theme.colors.primary
+									: theme.colors.dim
+							}
 							paddingX={1}
 						>
-							<Text bold color={theme.colors.secondary}>
-								{ICONS.HEART} Recent Favorites
-							</Text>
+							{renderTabHeader(`${ICONS.HEART} Recent Favorites`)}
 							{recentFavorites.length === 0 ? (
 								<Text color={theme.colors.dim}>
 									{' '}
@@ -294,28 +362,26 @@ export default function HomeLayout() {
 								</Text>
 							) : (
 								recentFavorites.map((track, index) => {
-									const actualIndex =
-										index + quickLinks.length + recentHistory.length;
+									const isSelected =
+										activeTab === 'favorites' && tabIndices.favorites === index;
 									return (
 										<Box key={track.videoId}>
 											<Text
 												backgroundColor={
-													selectedIndex === actualIndex
-														? theme.colors.primary
-														: undefined
+													isSelected ? theme.colors.primary : undefined
 												}
 												color={
-													selectedIndex === actualIndex
+													isSelected
 														? theme.colors.background
 														: theme.colors.text
 												}
 											>
-												{selectedIndex === actualIndex ? '> ' : '  '}
+												{isSelected ? '> ' : '  '}
 												{truncate(track.title, maxTitleLength)}
 											</Text>
 											<Text color={theme.colors.dim} wrap="truncate">
 												{' '}
-												- {track.artists[0]?.name}
+												- {track.artists?.[0]?.name}
 											</Text>
 										</Box>
 									);
@@ -385,7 +451,7 @@ export default function HomeLayout() {
 					<Text color={theme.colors.dim}>
 						{rows < 25
 							? 'Arrows: Nav • Enter: Select • /: Search • '
-							: 'Navigate: Arrows • Select: Enter • Search: / • '}
+							: 'Navigate: Arrows • Select: Enter • Tab: Switch • Search: / • '}
 						Quit{' '}
 						<Text
 							color={quitState >= 1 ? theme.colors.success : theme.colors.dim}

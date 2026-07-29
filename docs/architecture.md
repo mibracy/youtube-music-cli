@@ -49,6 +49,12 @@ youtube-music-cli/
 │   ├── hooks/               # Custom React hooks
 │   ├── types/               # TypeScript definitions
 │   ├── contexts/            # React contexts
+│   ├── immersive/           # Immersive Windows TUI
+│   │   ├── renderer/        # Frame buffer, braille canvas, ANSI codes
+│   │   ├── visualizer/      # Audio collector, disco engine
+│   │   ├── effects/         # Particle system, color extractor
+│   │   ├── native/          # Console, tray, notifications, hotkeys
+│   │   └── components/      # Immersive player component
 │   └── utils/               # Utilities
 │
 ├── plugins/                 # Plugin submodule
@@ -199,6 +205,65 @@ User Action → Store Dispatch → State Update → Plugin Hook → UI Re-render
                                     ▼
                             Plugin Event Emitted
 ```
+
+## Immersive Mode (Windows)
+
+A fullscreen Windows-only TUI experience wired to the real player stack (`PlayerService`, YouTube Music API). It renders ANSI graphics directly to the terminal using an alternate screen buffer.
+
+### Architecture
+
+```
+┌─────────────────────────────────────┐
+│  cli.tsx --win32 / immersive-entry  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│       immersive-app.ts (bridge)     │
+│  queue state + mpv IPC + search     │
+└──────────────┬──────────────────────┘
+               │
+       ┌───────┴───────┬──────────┬──────────┐
+       ▼               ▼          ▼          ▼
+  ┌─────────┐   ┌───────────┐ ┌────────┐ ┌────────┐
+  │Renderer │   │Visualizer │ │Effects │ │ Native │
+  │         │   │           │ │        │ │        │
+  │-FrameBuf│   │-HybridAud │ │-Particle│ │-Tray  │
+  │-Braille │   │-DiscoEng  │ │-ColorEx│ │-Hotkey │
+  │-ANSI    │   │           │ │        │ │-DPI   │
+  └─────────┘   └───────────┘ └────────┘ └────────┘
+```
+
+### Components
+
+- **Bridge** (`source/immersive/immersive-app.ts`) - Connects player services, queue state, library/search overlays, favorites, mix creation, and notifications
+- **Actions** (`source/immersive/actions/playback-actions.ts`) - Shared play-from-search, mix creation, favorites, and saved playlist helpers
+- **UI overlays** (`source/immersive/ui/`) - Search browse with type tabs, artist/album filters, adjustable limits, Shift+D download, library menu, 23-row settings overlay, two-line footer with mode status; player volume uses `=`/`+`/`-` (TUI parity)
+- **Renderer** (`source/immersive/renderer/`) - Frame buffer, braille canvas for 2x4 pixel density, flicker-free ANSI output
+- **Visualizer** (`source/immersive/visualizer/`) - Hybrid playback-synced audio bars, disco color cycling with beat detection
+- **Effects** (`source/immersive/effects/`) - Particle system for disco mode, dominant color extraction
+- **Native** (`source/immersive/native/`) - Console alt buffer, tray icon (`icon.ico`) with right-click Settings/Exit menu, `@bun-win32` DPI/hotkeys via runtime FFI loader
+
+### Entry Points
+
+```bash
+# Development
+bun run dev:win32
+
+# From main CLI
+youtube-music-cli --win32 --search "query"
+
+# Production build
+bun run build:win32
+# Output: dist/ymc-win32.exe
+
+# Build all (bun + node + win32 + web)
+bun run build:all
+```
+
+### Build
+
+Uses `bun build --compile --target bun-windows-x64` to produce a standalone Windows executable with the immersive bridge entry point.
 
 ## Component Architecture
 

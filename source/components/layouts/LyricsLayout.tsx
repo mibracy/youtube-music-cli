@@ -1,15 +1,17 @@
-// Lyrics view layout - displays synced or plain lyrics
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {KEYBINDINGS} from '../../utils/constants.ts';
+import {useNavigation} from '../../hooks/useNavigation.ts';
 import {
 	getLyricsService,
 	type LyricLine,
 } from '../../services/lyrics/lyrics.service.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 
-const CONTEXT_LINES = 3; // Lines shown before/after current line
+const CONTEXT_LINES = 4;
 
 export default function LyricsLayout() {
 	const {theme} = useTheme();
@@ -22,8 +24,14 @@ export default function LyricsLayout() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const lyricsService = getLyricsService();
+	const {dispatch} = useNavigation();
 
-	// Fetch lyrics when track changes
+	const goBack = useCallback(() => {
+		dispatch({category: 'GO_BACK'});
+	}, [dispatch]);
+
+	useKeyBinding(KEYBINDINGS.BACK, goBack);
+
 	useEffect(() => {
 		const track = state.currentTrack;
 		let cancelled = false;
@@ -77,17 +85,22 @@ export default function LyricsLayout() {
 	const title = track?.title ?? 'No track playing';
 	const artist = track?.artists?.map(a => a.name).join(', ') ?? '';
 
-	// Determine current line
 	const currentLineIndex = lyrics?.synced
 		? lyricsService.getCurrentLineIndex(lyrics.synced, state.progress)
 		: -1;
 
-	// Calculate visible lines window
 	const visibleLines = (() => {
 		if (!lyrics?.synced) return null;
-		const start = Math.max(0, currentLineIndex - CONTEXT_LINES);
-		const maxLines = Math.max(5, rows - 8);
-		const end = Math.min(lyrics.synced.length, start + maxLines);
+
+		const clampedIndex = Math.max(0, currentLineIndex);
+		const total = lyrics.synced.length;
+		const windowSize = CONTEXT_LINES * 2 + 1;
+
+		const initialStart = Math.max(0, clampedIndex - CONTEXT_LINES);
+		const initialEnd = Math.min(total, initialStart + windowSize);
+		const start = Math.max(0, initialEnd - windowSize);
+		const end = Math.min(total, start + windowSize);
+
 		return lyrics.synced.slice(start, end).map((line, i) => ({
 			line,
 			globalIndex: start + i,
@@ -95,8 +108,7 @@ export default function LyricsLayout() {
 	})();
 
 	return (
-		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={1}>
-			{/* Header */}
+		<Box flexDirection="column" flexGrow={1}>
 			<Box
 				borderStyle="double"
 				borderColor={theme.colors.secondary}
@@ -108,35 +120,60 @@ export default function LyricsLayout() {
 				{artist && <Text color={theme.colors.secondary}> — {artist}</Text>}
 			</Box>
 
-			{loading && <Text color={theme.colors.accent}>Loading lyrics...</Text>}
-
-			{error && !loading && <Text color={theme.colors.dim}>{error}</Text>}
-
-			{/* Synced lyrics */}
-			{!loading && visibleLines && (
-				<Box flexDirection="column" paddingX={1}>
-					{visibleLines.map(({line, globalIndex}) => (
-						<Text
-							key={globalIndex}
-							bold={globalIndex === currentLineIndex}
-							color={
-								globalIndex === currentLineIndex
-									? theme.colors.primary
-									: globalIndex < currentLineIndex
-										? theme.colors.dim
-										: theme.colors.text
-							}
-						>
-							{globalIndex === currentLineIndex ? '▶ ' : '  '}
-							{line.text || '♪'}
-						</Text>
-					))}
+			{loading && (
+				<Box flexGrow={1} alignItems="center" justifyContent="center">
+					<Text color={theme.colors.accent}>Loading lyrics...</Text>
 				</Box>
 			)}
 
-			{/* Plain lyrics fallback */}
+			{error && !loading && (
+				<Box flexGrow={1} alignItems="center" justifyContent="center">
+					<Text color={theme.colors.dim}>{error}</Text>
+				</Box>
+			)}
+
+			{!loading && visibleLines && (
+				<Box
+					flexGrow={1}
+					flexDirection="column"
+					alignItems="center"
+					justifyContent="center"
+				>
+					{visibleLines.map(({line, globalIndex}) => {
+						const isCurrent = globalIndex === currentLineIndex;
+						const isPast = globalIndex < currentLineIndex;
+
+						return (
+							<Box key={globalIndex} flexDirection="column" alignItems="center">
+								{isCurrent && <Text> </Text>}
+								<Text
+									bold={isCurrent}
+									underline={isCurrent}
+									color={
+										isCurrent
+											? theme.colors.primary
+											: isPast
+												? theme.colors.dim
+												: theme.colors.text
+									}
+								>
+									{isCurrent ? '▶ ' : '  '}
+									{line.text || '♪'}
+								</Text>
+								{isCurrent && <Text> </Text>}
+							</Box>
+						);
+					})}
+				</Box>
+			)}
+
 			{!loading && !lyrics?.synced && lyrics?.plain && (
-				<Box flexDirection="column" paddingX={1}>
+				<Box
+					flexGrow={1}
+					flexDirection="column"
+					alignItems="center"
+					justifyContent="center"
+				>
 					{lyrics.plain
 						.split('\n')
 						.slice(0, Math.max(5, rows - 8))
@@ -150,7 +187,8 @@ export default function LyricsLayout() {
 
 			<Box marginTop={1}>
 				<Text color={theme.colors.dim}>
-					Press <Text color={theme.colors.text}>l</Text> or{' '}
+					Press <Text color={theme.colors.text}>:q</Text> to quit,{' '}
+					<Text color={theme.colors.text}>l</Text> or{' '}
 					<Text color={theme.colors.text}>Esc</Text> to go back
 				</Text>
 			</Box>

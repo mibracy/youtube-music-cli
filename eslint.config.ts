@@ -12,6 +12,7 @@ export default defineConfig([
 			'plugins/**/*',
 			'scripts/**/*',
 			'dist/**/*',
+			'discord-bot/**/*',
 			'.claude/**/*',
 			'.kilocode/**/*',
 			'.agents/**/*',

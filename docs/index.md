@@ -6,6 +6,9 @@ title: Home
 <div class="hero">
   <h1>🎵 youtube-music-cli</h1>
   <p>A powerful Terminal User Interface (TUI) music player for YouTube Music</p>
+<p align="center">
+  <img src="assets/player-preview.gif" alt="youtube-music-cli terminal preview" width="800">
+</p>
   <div class="hero-buttons">
     <a href="{{ '/getting-started' | relative_url }}" class="btn btn-primary">Get Started</a>
     <a href="https://github.com/involvex/youtube-music-cli" class="btn btn-secondary">View on GitHub</a>
@@ -20,6 +23,13 @@ title: Home
     <div>
       <h3>Beautiful TUI</h3>
       <p>Rich terminal interface with multiple themes (Dark, Light, Midnight, Matrix)</p>
+    </div>
+  </div>
+  <div class="feature">
+    <span class="feature-icon">🖥️</span>
+    <div>
+      <h3>Immersive Mode (Windows)</h3>
+      <p>Fullscreen visual experience with audio visualization and disco effects</p>
     </div>
   </div>
   <div class="feature">

@@ -72,7 +72,9 @@ sudo apt install yt-dlp
 
 ## Installation
 
-### npm (Recommended)
+### Node.js (Recommended)
+
+Requires [Node.js](https://nodejs.org) 18+ installed.
 
 ```bash
 npm install -g @involvex/youtube-music-cli
@@ -114,9 +116,16 @@ iwr https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/in
 ```bash
 git clone https://github.com/involvex/youtube-music-cli.git
 cd youtube-music-cli
+
+# With bun (recommended for development)
 bun install
 bun run build
 bun link
+
+# With npm
+npm install
+npm run build
+npm link
 ```
 
 ## First Run
@@ -126,6 +135,10 @@ Launch the TUI:
 ```bash
 youtube-music-cli
 ```
+
+<p align="center">
+  <img src="{{ '/assets/player-preview.gif' | relative_url }}" alt="youtube-music-cli terminal preview" width="800">
+</p>
 
 You should see the main player interface. Press `?` for help or `/` to search.
 

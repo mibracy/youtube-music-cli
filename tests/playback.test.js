@@ -146,10 +146,10 @@ test('NEXT with shuffle=true wraps with repeat=all using random pick', async t =
 		t.not(next.queuePosition, 0, 'shuffle must not return current position');
 	}
 });
-
 test('discord rpc service no-ops when disabled', async t => {
 	const {getDiscordRpcService} =
 		await import('../source/services/discord/discord-rpc.service.ts');
+
 	const rpc = getDiscordRpcService();
 
 	rpc.setEnabled(false);
@@ -162,4 +162,47 @@ test('discord rpc service no-ops when disabled', async t => {
 	await rpc.clearActivity();
 
 	t.pass();
+});
+
+// ── Radio / queue continuation tests ──────────────────────────────────────────
+
+test('CLEAR_QUEUE_AFTER_CURRENT removes only tracks after current position', async t => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b', 'c', 'd'].map(makeTrack);
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 1,
+		currentTrack: tracks[1],
+		isPlaying: true,
+	});
+	const next = playerReducer(state, {category: 'CLEAR_QUEUE_AFTER_CURRENT'});
+	t.is(next.queue.length, 2);
+	t.is(next.queue[0]?.videoId, 'a');
+	t.is(next.queue[1]?.videoId, 'b');
+	t.is(next.queuePosition, 1);
+	t.is(next.currentTrack?.videoId, 'b');
+	t.true(next.isPlaying);
+});
+
+test('CLEAR_QUEUE_AFTER_CURRENT at end of queue keeps last track', async t => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b'].map(makeTrack);
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 1,
+		currentTrack: tracks[1],
+	});
+	const next = playerReducer(state, {category: 'CLEAR_QUEUE_AFTER_CURRENT'});
+	t.is(next.queue.length, 2);
+	t.is(next.queuePosition, 1);
+});
+
+test('START_RADIO enables radio mode and forces autoplay on', async t => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({autoplay: false, radioIsActive: false});
+	const seed = {type: 'track', id: 'a', name: 'Track A'};
+	const next = playerReducer(state, {category: 'START_RADIO', seed});
+	t.true(next.radioIsActive);
+	t.is(next.radioSeed, seed);
+	t.true(next.autoplay);
 });

@@ -1,0 +1,14 @@
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: discord-bot/Dockerfile
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ymc-bot-data:/data
+    env_file:
+      - .env
+
+volumes:
+  ymc-bot-data:

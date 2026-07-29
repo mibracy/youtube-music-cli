@@ -207,6 +207,10 @@ class ConfigService {
 		return this.config.favorites;
 	}
 
+	getLegacyFavoriteIds(): string[] {
+		return [...this.config.favorites];
+	}
+
 	setBackgroundPlaybackState(state: {
 		ipcPath: string;
 		currentUrl: string;

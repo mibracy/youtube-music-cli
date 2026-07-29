@@ -109,8 +109,15 @@ export function playerReducer(
 				};
 			}
 
+			// If the current track isn't in the queue (standalone play),
+			// advance to the first track in the queue instead of skipping it
+			const currentInQueue = state.queue.some(
+				t => t.videoId === state.currentTrack?.videoId,
+			);
+			const basePosition = currentInQueue ? state.queuePosition : -1;
+
 			// Sequential mode
-			const nextPosition = state.queuePosition + 1;
+			const nextPosition = basePosition + 1;
 			if (nextPosition >= state.queue.length) {
 				if (state.repeat === 'all') {
 					return {
@@ -238,6 +245,14 @@ export function playerReducer(
 				isPlaying: false,
 			};
 
+		case 'CLEAR_QUEUE_AFTER_CURRENT': {
+			const cutoff = state.queuePosition + 1;
+			return {
+				...state,
+				queue: state.queue.slice(0, cutoff),
+			};
+		}
+
 		case 'SET_QUEUE_POSITION':
 			if (action.position >= 0 && action.position < state.queue.length) {
 				return {
@@ -277,7 +292,12 @@ export function playerReducer(
 			return {...state, isLoading: action.loading};
 
 		case 'SET_ERROR':
-			return {...state, error: action.error, isLoading: false};
+			return {
+				...state,
+				error: action.error,
+				isLoading: false,
+				isPlaying: false,
+			};
 
 		case 'SET_SPEED': {
 			const clampedSpeed = Math.max(0.25, Math.min(4.0, action.speed));
@@ -335,7 +355,7 @@ import type {Track} from '../types/youtube-music.types.ts';
 type PlayerContextValue = {
 	state: PlayerState;
 	dispatch: (action: PlayerAction) => void;
-	play: (track: Track) => void;
+	play: (track: Track, options?: {clearQueue?: boolean}) => void;
 	pause: () => void;
 	resume: () => void;
 	stop: () => void;
@@ -359,7 +379,7 @@ type PlayerContextValue = {
 	speedUp: () => void;
 	speedDown: () => void;
 	setABLoop: (a: number | null, b: number | null) => void;
-	startRadio: (seed: RadioSeed) => void;
+	startRadio: (seed: RadioSeed, options?: {playNow?: boolean}) => void;
 	stopRadio: () => void;
 };
 
@@ -568,13 +588,18 @@ function PlayerManager() {
 					if (config.get('discordRichPresence')) {
 						const discord = getDiscordRpcService();
 						discord.setEnabled(true);
-						void discord.connect().then(() =>
-							discord.updateActivity({
-								title: track.title,
-								artist: artists,
-								startTimestamp: Date.now(),
-							}),
-						);
+						void discord
+							.connect()
+							.then(() =>
+								discord.updateActivity({
+									title: track.title,
+									artist: artists,
+									startTimestamp: Date.now(),
+								}),
+							)
+							.catch(() => {
+								// Discord not available; already logged by service
+							});
 					}
 
 					// MPRIS (Linux)
@@ -702,7 +727,7 @@ function PlayerManager() {
 				currentTrackId,
 				stateVideoId: state.currentTrack?.videoId,
 			});
-			if (!currentTrackId || state.currentTrack?.videoId === currentTrackId) {
+			if (currentTrackId && state.currentTrack?.videoId === currentTrackId) {
 				playerService.resume();
 			} else {
 				logger.debug('PlayerManager', 'Skipping resume', {
@@ -783,6 +808,13 @@ function PlayerManager() {
 		if (state.repeat === 'all' || (state.shuffle && state.queue.length > 1)) {
 			return;
 		}
+
+		// Don't fetch suggestions when playing through a queue (playlist, etc.)
+		// Only fetch for standalone tracks not part of the queue
+		const trackInQueue = state.queue.some(
+			t => t.videoId === state.currentTrack?.videoId,
+		);
+		if (trackInQueue) return;
 
 		// In radio mode, fetch more aggressively (when ≤15 tracks ahead)
 		// In regular autoplay, only fetch when ≤5 tracks ahead
@@ -865,7 +897,7 @@ function PlayerManager() {
 		state.isPlaying,
 		state.repeat,
 		state.shuffle,
-		state.queue.length,
+		state.queue,
 		state.queuePosition,
 		state.radioIsActive,
 		state.radioSeed,
@@ -1025,7 +1057,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 
 	const actions = useMemo(
 		() => ({
-			play: (track: Track) => {
+			play: (track: Track, _options?: {clearQueue?: boolean}) => {
 				logger.info('PlayerProvider', 'play() action dispatched', {
 					title: track.title,
 					videoId: track.videoId,
@@ -1073,7 +1105,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			setABLoop: (a: number | null, b: number | null) => {
 				dispatch({category: 'SET_AB_LOOP', a, b});
 			},
-			startRadio: (seed: RadioSeed) => {
+			startRadio: (seed: RadioSeed, _options?: {playNow?: boolean}) => {
 				dispatch({category: 'START_RADIO', seed});
 			},
 			stopRadio: () => {

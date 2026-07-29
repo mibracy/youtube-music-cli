@@ -4,6 +4,10 @@
 
 A powerful Terminal User Interface (TUI) music player for YouTube Music
 
+<p align="center">
+  <img src="assets/player-preview.gif" alt="youtube-music-cli terminal preview" width="800">
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@involvex/youtube-music-cli.svg)](https://www.npmjs.com/package/@involvex/youtube-music-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -25,7 +29,7 @@ A powerful Terminal User Interface (TUI) music player for YouTube Music
 - 🎨 **Themes** - Dark, Light, Midnight, Matrix themes
 - 🔌 **Plugin System** - Extend functionality with plugins
 - ⌨️ **Keyboard-Driven** - Efficient vim-style navigation
-- 🖥️ **Headless Mode** - Run without TUI for scripting
+- 🖥️ **Immersive Mode** - Fullscreen Windows TUI with audio visualizer and disco effects
 - 💾 **Downloads** - Save tracks/playlists/artists with `Shift+D`
 - 🏷️ **Metadata Tagging** - Auto-tag title/artist/album with optional cover art
 - ⚡️ **Shell Completions** - `ymc completions <bash|zsh|powershell|fish>` emits scripts you can source or save so the CLI (also available as `ymc`) tab-completes subcommands and flags
@@ -94,7 +98,9 @@ sudo dnf install mpv yt-dlp
 
 ## Installation
 
-### npm (Recommended)
+### Node.js (Recommended)
+
+Requires [Node.js](https://nodejs.org) 18+ installed.
 
 ```bash
 npm install -g @involvex/youtube-music-cli
@@ -136,9 +142,16 @@ iwr https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/in
 ```bash
 git clone https://github.com/involvex/youtube-music-cli.git
 cd youtube-music-cli
+
+# With bun (recommended for development)
 bun install
 bun run build
 bun link
+
+# With npm
+npm install
+npm run build
+npm link
 ```
 
 ## Usage
@@ -173,6 +186,59 @@ youtube-music-cli skip
 youtube-music-cli back
 ```
 
+### Immersive Mode (Windows)
+
+Launch a fullscreen visual player with real playback, queue controls, and audio visualization. Requires `mpv` and `yt-dlp` (same as normal playback).
+
+```bash
+# Standard immersive mode
+youtube-music-cli --win32
+
+# Search and play immediately
+youtube-music-cli --win32 --search "artist song"
+
+# With disco mode enabled
+DISCO_MODE=true youtube-music-cli --win32
+
+# Standalone Windows binary (Bun compile)
+bun run build:win32
+dist/ymc-win32.exe
+```
+
+**Hotkeys in Immersive Mode:**
+
+| Key        | Action                                       |
+| ---------- | -------------------------------------------- |
+| `/` or `S` | Open search overlay                          |
+| `Tab`      | Cycle search type (query view)               |
+| `Ctrl+A`   | Edit artist filter                           |
+| `Ctrl+L`   | Edit album filter                            |
+| `=` / `+`  | Volume up (+5%, player view)                 |
+| `-`        | Volume down (-5%, player view)               |
+| `+`        | Increase search result limit (query view)    |
+| `-`        | Decrease search result limit (query view)    |
+| `Shift+D`  | Download selected search result              |
+| `Space`    | Play / Pause                                 |
+| `F`        | Toggle favorite (current track or search)    |
+| `L`        | Library menu (playlists, favorites)          |
+| `P`        | Open saved playlist picker                   |
+| `E`        | Play all favorites                           |
+| `Shift+S`  | Toggle shuffle                               |
+| `R`        | Cycle repeat (off → all → one)               |
+| `,`        | Open settings overlay (Ctrl+, on WT also)    |
+| `M`        | Create mix from search result (results view) |
+| `D`        | Toggle disco mode                            |
+| `↑` / `↓`  | Navigate lists (overlays)                    |
+| `←` / `→`  | Previous / Next track                        |
+| `Enter`    | Select / play (overlays)                     |
+| `Esc`      | Back / close overlay                         |
+| `Q`        | Quit immersive mode                          |
+| `Ctrl+C`   | Force quit                                   |
+
+The footer shows shuffle/repeat/disco status on one line and prioritized shortcuts on the next. Random favorite is available from the library menu (`L`). Right-click the system tray icon for **Settings** or **Exit** (uses `assets/icon.ico`).
+
+Global media keys (Alt+Media keys) also work when the terminal is unfocused on Windows with Bun runtime.
+
 ### Shell completions
 
 Generate shell completion helpers through the lightweight `ymc` alias that ships with the CLI. Run `ymc completions <bash|zsh|powershell|fish>` to print the completion script for your shell, then source it or persist it in your profile:
@@ -204,6 +270,7 @@ If you installed the CLI globally with an alias or script name, make sure `ymc` 
 | `--shuffle`  | `-s`  | Enable shuffle mode                          |
 | `--repeat`   | `-r`  | Repeat mode: `off`, `all`, `one`             |
 | `--headless` |       | Run without TUI                              |
+| `--win32`    |       | Immersive fullscreen mode (Windows only)     |
 | `--help`     | `-h`  | Show help                                    |
 
 ### Examples
@@ -415,7 +482,7 @@ bun run typecheck
 
 ## Tech Stack
 
-- **Runtime:** [Bun](https://bun.sh/) / Node.js
+- **Runtime:** Node.js 18+ / [Bun](https://bun.sh/)
 - **UI Framework:** [Ink](https://github.com/vadimdemedes/ink) (React for CLI)
 - **Language:** TypeScript
 - **Audio:** mpv + yt-dlp
