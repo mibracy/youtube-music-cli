@@ -144,11 +144,7 @@ export default function LyricsLayout() {
 						const isPast = globalIndex < currentLineIndex;
 
 						return (
-							<Box
-								key={globalIndex}
-								flexDirection="column"
-								alignItems="center"
-							>
+							<Box key={globalIndex} flexDirection="column" alignItems="center">
 								{isCurrent && <Text> </Text>}
 								<Text
 									bold={isCurrent}

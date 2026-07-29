@@ -304,10 +304,7 @@ function MainLayout() {
 			borderStyle="single"
 			borderColor={theme.colors.primary}
 		>
-			<Box
-				flexGrow={1}
-				minHeight={Math.max(0, rows - 5)}
-			>
+			<Box flexGrow={1} minHeight={Math.max(0, rows - 5)}>
 				{currentView}
 			</Box>
 

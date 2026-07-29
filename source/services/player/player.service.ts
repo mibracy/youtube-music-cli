@@ -382,13 +382,20 @@ class PlayerService {
 					if (urlToLoad) {
 						try {
 							const parsed = new URL(urlToLoad);
+							const hasVideoId = parsed.searchParams.has('v');
 							logger.info('PlayerService', 'Loading URL via IPC loadfile', {
 								url: `${parsed.origin}${parsed.pathname}`,
+								hasVideoId,
+								videoId: parsed.searchParams.get('v') ?? null,
+								fullLength: urlToLoad.length,
 							});
 						} catch {
-							logger.info('PlayerService', 'Loading URL via IPC loadfile');
+							logger.info('PlayerService', 'Loading URL via IPC loadfile', {
+								raw: urlToLoad,
+							});
 						}
-						this.sendIpcCommand(['loadfile', urlToLoad]);
+						const loadfileRequestId = ++this.ipcRequestIdCounter;
+						this.sendIpcCommand(['loadfile', urlToLoad], loadfileRequestId);
 					}
 
 					settled = true;
@@ -424,10 +431,12 @@ class PlayerService {
 		});
 	}
 
+	private ipcRequestIdCounter = 0;
+
 	/**
 	 * Send command to mpv via IPC
 	 */
-	private sendIpcCommand(command: unknown[]): void {
+	private sendIpcCommand(command: unknown[], requestId?: number): void {
 		if (!this.ipcSocket || this.ipcSocket.destroyed) {
 			logger.warn(
 				'PlayerService',
@@ -436,7 +445,12 @@ class PlayerService {
 			return;
 		}
 
-		const message = JSON.stringify({command}) + '\n';
+		const payload: Record<string, unknown> = {command};
+		if (requestId !== undefined) {
+			payload.request_id = requestId;
+		}
+
+		const message = JSON.stringify(payload) + '\n';
 		this.ipcSocket.write(message);
 
 		logger.debug('PlayerService', 'Sent IPC command', {
@@ -456,10 +470,18 @@ class PlayerService {
 
 				if (message.event === 'property-change') {
 					this.handlePropertyChange(message);
-				} else if (message.error !== 'success' && message.error) {
-					logger.warn('PlayerService', 'IPC error response', {
-						error: message.error,
-					});
+				} else if (message.error) {
+					if (message.error === 'success') {
+						logger.debug('PlayerService', 'IPC command success', {
+							request_id: message.request_id,
+							command: message.command,
+						});
+					} else {
+						logger.warn('PlayerService', 'IPC error response', {
+							request_id: message.request_id,
+							error: message.error,
+						});
+					}
 				}
 			} catch (err) {
 				logger.debug('PlayerService', 'Failed to parse IPC message', {
@@ -783,6 +805,19 @@ class PlayerService {
 			return;
 		}
 
+		// If mpv is already running (just spawned by play()) and IPC is about
+		// to connect, do NOT fall back to play() — that would race with the
+		// in-progress spawn. The pending IPC timer will connect and load the
+		// file.
+		if (this.mpvProcess) {
+			logger.debug(
+				'PlayerService',
+				'Resume deferred — mpv process running, IPC pending',
+			);
+			this.isPlaying = true;
+			return;
+		}
+
 		if (this.currentUrl) {
 			logger.info('PlayerService', 'Resume fallback: restarting track');
 			this.isPlaying = true;
@@ -811,7 +846,6 @@ class PlayerService {
 				this.mpvProcess.kill('SIGTERM');
 				this.mpvProcess = null;
 				this.isPlaying = false;
-				this.currentTrackId = null; // Clear track ID on stop
 				logger.info('PlayerService', 'mpv process killed');
 			} catch (error) {
 				logger.error('PlayerService', 'Error killing mpv process', {

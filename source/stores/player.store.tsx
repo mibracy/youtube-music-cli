@@ -727,7 +727,7 @@ function PlayerManager() {
 				currentTrackId,
 				stateVideoId: state.currentTrack?.videoId,
 			});
-			if (!currentTrackId || state.currentTrack?.videoId === currentTrackId) {
+			if (currentTrackId && state.currentTrack?.videoId === currentTrackId) {
 				playerService.resume();
 			} else {
 				logger.debug('PlayerManager', 'Skipping resume', {

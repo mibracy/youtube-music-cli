@@ -49,9 +49,7 @@ export default function NewReleasesLayout() {
 			})
 			.catch((err: unknown) => {
 				if (!cancelled) {
-					setError(
-						err instanceof Error ? err.message : 'Failed to load',
-					);
+					setError(err instanceof Error ? err.message : 'Failed to load');
 					setIsLoading(false);
 				}
 			});
@@ -77,11 +75,7 @@ export default function NewReleasesLayout() {
 			})
 			.catch((err: unknown) => {
 				if (!cancelled) {
-					setError(
-						err instanceof Error
-							? err.message
-							: 'Failed to load genre',
-					);
+					setError(err instanceof Error ? err.message : 'Failed to load genre');
 					setIsLoading(false);
 				}
 			});
@@ -93,9 +87,7 @@ export default function NewReleasesLayout() {
 	const VISIBLE_COUNT = 42;
 
 	const currentReleases =
-		genreIndex === 0
-			? sections.flatMap(s => s.releases)
-			: genreReleases;
+		genreIndex === 0 ? sections.flatMap(s => s.releases) : genreReleases;
 
 	const halfWindow = Math.floor(VISIBLE_COUNT / 2);
 	const sliceStart = Math.max(
@@ -110,8 +102,7 @@ export default function NewReleasesLayout() {
 		sliceStart + VISIBLE_COUNT,
 	);
 	const hasMoreAbove = sliceStart > 0;
-	const hasMoreBelow =
-		sliceStart + VISIBLE_COUNT < currentReleases.length;
+	const hasMoreBelow = sliceStart + VISIBLE_COUNT < currentReleases.length;
 
 	const allLabels = ['All', ...genres.map(g => g.title)];
 
@@ -136,9 +127,7 @@ export default function NewReleasesLayout() {
 		} else if (key.upArrow || input === 'k') {
 			setReleaseIndex(i => Math.max(0, i - 1));
 		} else if (key.downArrow || input === 'j') {
-			setReleaseIndex(i =>
-				Math.min(currentReleases.length - 1, i + 1),
-			);
+			setReleaseIndex(i => Math.min(currentReleases.length - 1, i + 1));
 		} else if (key.return) {
 			const release = currentReleases[releaseIndex];
 			if (release?.browseId) {
@@ -164,9 +153,7 @@ export default function NewReleasesLayout() {
 					.catch((err: unknown) => {
 						setIsLoading(false);
 						setError(
-							err instanceof Error
-								? err.message
-								: 'Failed to load tracks',
+							err instanceof Error ? err.message : 'Failed to load tracks',
 						);
 					});
 			}
@@ -186,11 +173,7 @@ export default function NewReleasesLayout() {
 					{allLabels.map((label, i) => (
 						<Text
 							key={label}
-							color={
-								i === genreIndex
-									? theme.colors.primary
-									: theme.colors.dim
-							}
+							color={i === genreIndex ? theme.colors.primary : theme.colors.dim}
 							bold={i === genreIndex}
 							underline={i === genreIndex}
 						>
@@ -209,49 +192,30 @@ export default function NewReleasesLayout() {
 				<Text color={theme.colors.dim}>No releases found</Text>
 			) : (
 				<Box flexDirection="column">
-					{hasMoreAbove && (
-						<Text color={theme.colors.dim}>··</Text>
-					)}
+					{hasMoreAbove && <Text color={theme.colors.dim}>··</Text>}
 					{windowedReleases.map((release, i) => {
 						const absoluteIndex = sliceStart + i;
 						const isSelected = absoluteIndex === releaseIndex;
 						return (
-							<Box
-								key={
-									release.browseId + String(absoluteIndex)
-								}
-							>
+							<Box key={release.browseId + String(absoluteIndex)}>
 								<Text
-									color={
-										isSelected
-											? theme.colors.primary
-											: theme.colors.dim
-									}
+									color={isSelected ? theme.colors.primary : theme.colors.dim}
 								>
 									{isSelected
 										? '▶ '
 										: `${String(absoluteIndex + 1).padStart(2)}. `}
 								</Text>
 								<Text
-									color={
-										isSelected
-											? theme.colors.primary
-											: theme.colors.text
-									}
+									color={isSelected ? theme.colors.primary : theme.colors.text}
 									bold={isSelected}
 								>
 									{release.title}
 								</Text>
-								<Text color={theme.colors.dim}>
-									{' '}
-									— {release.artist}
-								</Text>
+								<Text color={theme.colors.dim}> — {release.artist}</Text>
 							</Box>
 						);
 					})}
-					{hasMoreBelow && (
-						<Text color={theme.colors.dim}>··</Text>
-					)}
+					{hasMoreBelow && <Text color={theme.colors.dim}>··</Text>}
 				</Box>
 			)}
 
