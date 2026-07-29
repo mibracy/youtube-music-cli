@@ -1,6 +1,7 @@
 // Explicit action type definitions
 import type {SearchFilters, Track} from './youtube-music.types.ts';
 import type {RadioSeed} from './radio.types.ts';
+import type {PlaybackMode, RadioStation} from './radio-station.types.ts';
 
 export interface PlayAction {
 	readonly category: 'PLAY';
@@ -76,6 +77,11 @@ export interface AddToQueueAction {
 	track: Track;
 }
 
+export interface PlayNextAction {
+	readonly category: 'PLAY_NEXT';
+	track: Track;
+}
+
 export interface RemoveFromQueueAction {
 	readonly category: 'REMOVE_FROM_QUEUE';
 	index: number;
@@ -118,6 +124,11 @@ export interface SetErrorAction {
 	error: string | null;
 }
 
+export interface SetMediaSourceAction {
+	readonly category: 'SET_MEDIA_SOURCE';
+	mediaSource: 'local' | 'youtube' | null;
+}
+
 export interface RestoreStateAction {
 	readonly category: 'RESTORE_STATE';
 	currentTrack: Track | null;
@@ -128,6 +139,12 @@ export interface RestoreStateAction {
 	shuffle: boolean;
 	repeat: 'off' | 'all' | 'one';
 	autoplay?: boolean;
+	explicitQueueLength?: number;
+	/** Restores live/radio stream playback instead of a YouTube track. */
+	playbackMode?: PlaybackMode;
+	currentStation?: RadioStation | null;
+	radioIsActive?: boolean;
+	radioSeed?: RadioSeed | null;
 }
 
 export interface SetSpeedAction {
@@ -138,6 +155,11 @@ export interface SetSpeedAction {
 export interface SetSubtitleAction {
 	readonly category: 'SET_SUBTITLE';
 	subtitle: string | null;
+}
+
+export interface SetStreamNowPlayingAction {
+	readonly category: 'SET_STREAM_NOW_PLAYING';
+	streamNowPlaying: import('./radio-station.types.ts').StreamNowPlaying | null;
 }
 
 export interface SetABLoopAction {
@@ -214,4 +236,9 @@ export interface StopRadioAction {
 
 export interface ToggleRadioAction {
 	readonly category: 'TOGGLE_RADIO';
+}
+
+export interface PlayStreamAction {
+	readonly category: 'PLAY_STREAM';
+	station: RadioStation;
 }

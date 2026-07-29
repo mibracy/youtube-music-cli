@@ -16,9 +16,11 @@ import type {
 	ChannelSearchResult,
 	SearchResponse as YoutubeiSearchResponse,
 } from '../../types/youtubei.types.ts';
-import {ClientType, Innertube, Log, Platform} from 'youtubei.js';
+import {ClientType, Innertube, Log} from 'youtubei.js';
 import {logger} from '../logger/logger.service.ts';
-import {getSearchCache} from '../cache/cache.service.ts';
+import {getSearchCache, getSuggestionsCache} from '../cache/cache.service.ts';
+import {getConfigService} from '../config/config.service.ts';
+import {getInvidiousHealthService} from '../invidious/invidious-health.service.ts';
 
 // Initialize YouTube client
 let ytClient: Innertube | null = null;
@@ -39,7 +41,6 @@ type MusicSearchLike = {
 	albums?: {contents?: unknown[]};
 	artists?: {contents?: unknown[]};
 	playlists?: {contents?: unknown[]};
-	contents?: unknown[];
 };
 
 function toMusicSearchType(
@@ -83,7 +84,7 @@ function getMusicShelfItems(shelf: unknown): MusicSearchItem[] {
 	);
 }
 
-export function parseVideoId(value: string): string | null {
+function parseVideoId(value: string): string | null {
 	const trimmedValue = value.trim();
 	if (!trimmedValue) {
 		return null;
@@ -162,18 +163,11 @@ async function getClient() {
 	if (!ytClient) {
 		// Suppress noisy youtubei.js parser warnings in TUI output.
 		Log.setLevel(Log.Level.ERROR);
-
-		// Provide a JS evaluator for deciphering audio stream URLs.
-		// youtubei.js ships with a no-op eval that throws. We use `new Function()`
-		// because it treats the code as a function body, allowing top-level `return`
-		// statements (which the player decipher code uses).
-		const isBunRuntime =
-			typeof (globalThis as {Bun?: unknown}).Bun !== 'undefined';
-		if (isBunRuntime) {
-			Platform.shim.eval = async (data: {output: string}) => {
-				const fn = new Function(data.output);
-				return fn();
-			};
+		const proxy = getConfigService().getProxy();
+		if (proxy) {
+			// Set proxy environment variables for fetch/HTTP clients
+			process.env.HTTPS_PROXY = proxy;
+			process.env.HTTP_PROXY = proxy;
 		}
 
 		ytClient = await Innertube.create();
@@ -184,123 +178,13 @@ async function getClient() {
 /**
  * Creates a lightweight Innertube client using the ANDROID client type.
  * The ANDROID client returns direct stream URLs (no deciphering needed),
- * which function reliably on Bun's fetch implementation without 403 errors.
+ * which works well on Bun and avoids the heavy player extraction.
  */
-let ytAndroidClient: Innertube | null = null;
-
 async function getAndroidClient(): Promise<Innertube> {
-	if (!ytAndroidClient) {
-		Log.setLevel(Log.Level.ERROR);
-
-		ytAndroidClient = await Innertube.create({
-			client_type: ClientType.ANDROID,
-			retrieve_player: false,
-		});
-	}
-
-	return ytAndroidClient;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getItemId(item: any): string {
-	if (typeof item.id === 'string' && item.id.trim()) {
-		return item.id.trim();
-	}
-	if (typeof item.playlistId === 'string' && item.playlistId.trim()) {
-		return item.playlistId.trim();
-	}
-	if (typeof item.videoId === 'string' && item.videoId.trim()) {
-		return item.videoId.trim();
-	}
-	if (typeof item.content_id === 'string' && item.content_id.trim()) {
-		return item.content_id.trim();
-	}
-
-	// Check endpoints
-	const endpoint = item.endpoint || item.navigationEndpoint;
-	if (endpoint?.payload) {
-		if (
-			typeof endpoint.payload.playlistId === 'string' &&
-			endpoint.payload.playlistId.trim()
-		) {
-			return endpoint.payload.playlistId.trim();
-		}
-		if (
-			typeof endpoint.payload.videoId === 'string' &&
-			endpoint.payload.videoId.trim()
-		) {
-			return endpoint.payload.videoId.trim();
-		}
-		if (
-			typeof endpoint.payload.browseId === 'string' &&
-			endpoint.payload.browseId.trim()
-		) {
-			return endpoint.payload.browseId.trim();
-		}
-	}
-
-	return '';
-}
-
-function getItemTitle(item: MusicSearchItem): string {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const anyItem = item as any;
-
-	// Handle LockupView (used in general search)
-	if (anyItem.type === 'LockupView' && anyItem.metadata?.title?.text) {
-		return anyItem.metadata.title.text;
-	}
-
-	const title = item.title || item.name;
-	if (title && typeof title === 'string') {
-		return title;
-	}
-
-	// Try to get title from youtubei.js object if it has a toString or text property
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const titleObj = title as any;
-	if (titleObj && typeof titleObj === 'object') {
-		if (typeof titleObj.text === 'string') {
-			return titleObj.text;
-		}
-		if (
-			typeof titleObj.toString === 'function' &&
-			titleObj.toString() !== '[object Object]'
-		) {
-			return titleObj.toString();
-		}
-	}
-
-	// Some youtubei.js renderers have runs
-	if (anyItem.title?.runs?.[0]?.text) {
-		return anyItem.title.runs[0].text;
-	}
-
-	const flexColumns = (item as Record<string, unknown>).flex_columns as
-		Array<{title?: {text?: string}; runs?: Array<{text?: string}>}> | undefined;
-
-	if (flexColumns && flexColumns.length > 0) {
-		for (const column of flexColumns) {
-			if (column.title?.text) {
-				return column.title.text;
-			}
-			if (column.runs && column.runs.length > 0 && column.runs[0]?.text) {
-				return column.runs[0].text;
-			}
-		}
-	}
-
-	// Fallback for some specific renderer types
-	if (anyItem.text?.runs?.[0]?.text) {
-		return anyItem.text.runs[0].text;
-	}
-
-	// Last ditch effort: search for any 'text' property
-	if (anyItem.text && typeof anyItem.text === 'string') {
-		return anyItem.text;
-	}
-
-	return '';
+	const androidClient = await Innertube.create({
+		client_type: ClientType.ANDROID,
+	});
+	return androidClient;
 }
 
 class MusicService {
@@ -332,122 +216,86 @@ class MusicService {
 				type: toMusicSearchType(searchType),
 			})) as unknown as MusicSearchLike;
 
-			// Gather items from all possible sections/shelves
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const allShelves: any[] = [];
-			if (musicSearch.contents) {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				allShelves.push(...(musicSearch as any).contents);
+			if (searchType === 'all' || searchType === 'songs') {
+				const songItems = [
+					...getMusicShelfItems(musicSearch.songs),
+					...getMusicShelfItems(musicSearch.videos),
+				];
+				for (const item of songItems) {
+					const track = toTrack(item);
+					if (!track) {
+						continue;
+					}
+
+					results.push({
+						type: 'song',
+						data: track,
+					});
+				}
 			}
-			// Named shelves as well (compatibility)
-			if (musicSearch.songs) allShelves.push(musicSearch.songs);
-			if (musicSearch.videos) allShelves.push(musicSearch.videos);
-			if (musicSearch.playlists) allShelves.push(musicSearch.playlists);
-			if (musicSearch.artists) allShelves.push(musicSearch.artists);
-			if (musicSearch.albums) allShelves.push(musicSearch.albums);
 
-			for (const shelf of allShelves) {
-				const shelfItems = getMusicShelfItems(shelf);
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const shelfTitle = (shelf as any).title?.toString().toLowerCase() || '';
-
-				for (const item of shelfItems) {
-					const id = getItemId(item);
-					if (!id) continue;
-
-					const title = getItemTitle(item);
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const anyItem = item as any;
-
-					// Determine type
-					let type: SearchResult['type'] | null = null;
-
-					// Explicit item_type from API
-					if (
-						anyItem.item_type === 'song' ||
-						(anyItem.type === 'MusicResponsiveListItem' &&
-							(anyItem.videoId || anyItem.video_id))
-					) {
-						type = 'song';
-					} else if (
-						anyItem.item_type === 'playlist' ||
-						id.startsWith('VL') ||
-						id.startsWith('PL')
-					) {
-						type = 'playlist';
-					} else if (
-						anyItem.item_type === 'artist' ||
-						(anyItem.subscribers && !anyItem.song_count)
-					) {
-						type = 'artist';
-					} else if (
-						anyItem.item_type === 'album' ||
-						anyItem.year ||
-						anyItem.song_count
-					) {
-						type = 'album';
+			if (searchType === 'all' || searchType === 'playlists') {
+				for (const playlist of getMusicShelfItems(musicSearch.playlists)) {
+					const playlistId = playlist.id?.trim();
+					if (!playlistId) {
+						continue;
 					}
 
-					// Infer from shelf title if still unknown
-					if (!type) {
-						if (shelfTitle.includes('song') || shelfTitle.includes('video'))
-							type = 'song';
-						else if (shelfTitle.includes('playlist')) type = 'playlist';
-						else if (shelfTitle.includes('artist')) type = 'artist';
-						else if (shelfTitle.includes('album')) type = 'album';
+					results.push({
+						type: 'playlist',
+						data: {
+							playlistId,
+							name: playlist.title || playlist.name || 'Unknown Playlist',
+							tracks: [],
+						},
+					});
+				}
+			}
+
+			if (searchType === 'all' || searchType === 'artists') {
+				for (const artist of getMusicShelfItems(musicSearch.artists)) {
+					const artistId =
+						artist.id?.trim() ||
+						artist.author?.channel_id ||
+						artist.author?.id ||
+						'';
+					if (!artistId) {
+						continue;
 					}
 
-					if (!type && searchType !== 'all') {
-						type = toMusicSearchType(searchType) as SearchResult['type'];
+					results.push({
+						type: 'artist',
+						data: {
+							artistId,
+							name:
+								artist.name ||
+								artist.title ||
+								artist.author?.name ||
+								'Unknown Artist',
+						},
+					});
+				}
+			}
+
+			if (searchType === 'all' || searchType === 'albums') {
+				for (const album of getMusicShelfItems(musicSearch.albums)) {
+					const albumId = album.id?.trim();
+					if (!albumId) {
+						continue;
 					}
 
-					if (
-						type === 'song' &&
-						(searchType === 'all' || searchType === 'songs')
-					) {
-						const track = toTrack(item);
-						if (track) results.push({type: 'song', data: track});
-					} else if (
-						type === 'playlist' &&
-						(searchType === 'all' || searchType === 'playlists')
-					) {
-						results.push({
-							type: 'playlist',
-							data: {
-								playlistId: id,
-								name: title || 'Unknown Playlist',
-								tracks: [],
-							},
-						});
-					} else if (
-						type === 'artist' &&
-						(searchType === 'all' || searchType === 'artists')
-					) {
-						results.push({
-							type: 'artist',
-							data: {
-								artistId: id,
-								name: title || anyItem.author?.name || 'Unknown Artist',
-							},
-						});
-					} else if (
-						type === 'album' &&
-						(searchType === 'all' || searchType === 'albums')
-					) {
-						results.push({
-							type: 'album',
-							data: {
-								albumId: id,
-								name: title || 'Unknown Album',
-								// eslint-disable-next-line @typescript-eslint/no-explicit-any
-								artists: (anyItem.artists ?? []).map((artist: any) => ({
-									artistId: artist.channel_id || artist.id || '',
-									name: artist.name ?? 'Unknown',
-								})),
-								tracks: [],
-							},
-						});
-					}
+					results.push({
+						type: 'album',
+						data: {
+							albumId,
+							name: album.title || album.name || 'Unknown Album',
+							artists: (album.artists ?? []).map(artist => ({
+								artistId: artist.channel_id || artist.id || '',
+								name: artist.name ?? 'Unknown',
+							})),
+							tracks: [],
+						},
+					});
 				}
 			}
 
@@ -460,15 +308,20 @@ class MusicService {
 					const videos = search.videos as VideoSearchResult[] | undefined;
 					if (videos) {
 						for (const video of videos) {
-							const id = getItemId(video);
-							if (!id) continue;
+							const rawVideoId = video.id || video.video_id || '';
+							const videoId = parseVideoId(rawVideoId);
+							if ((!video.type && !rawVideoId) || !videoId) {
+								continue;
+							}
 
 							results.push({
 								type: 'song',
 								data: {
-									videoId: id,
-									// eslint-disable-next-line @typescript-eslint/no-explicit-any
-									title: getItemTitle(video as any) || 'Unknown',
+									videoId,
+									title:
+										(typeof video.title === 'string'
+											? video.title
+											: video.title?.text) || 'Unknown',
 									artists: [
 										{
 											artistId: video.channel_id || video.channel?.id || '',
@@ -493,15 +346,14 @@ class MusicService {
 						PlaylistSearchResult[] | undefined;
 					if (playlists) {
 						for (const playlist of playlists) {
-							const id = getItemId(playlist);
-							if (!id) continue;
-
 							results.push({
 								type: 'playlist',
 								data: {
-									playlistId: id,
-									// eslint-disable-next-line @typescript-eslint/no-explicit-any
-									name: getItemTitle(playlist as any) || 'Unknown Playlist',
+									playlistId: playlist.id || '',
+									name:
+										(typeof playlist.title === 'string'
+											? playlist.title
+											: playlist.title?.text) || 'Unknown Playlist',
 									tracks: [],
 								},
 							});
@@ -513,18 +365,14 @@ class MusicService {
 					const channels = search.channels as ChannelSearchResult[] | undefined;
 					if (channels) {
 						for (const channel of channels) {
-							const id = getItemId(channel);
-							if (!id) continue;
-
 							results.push({
 								type: 'artist',
 								data: {
-									artistId: id,
+									artistId: channel.id || channel.channelId || '',
 									name:
-										// eslint-disable-next-line @typescript-eslint/no-explicit-any
-										getItemTitle(channel as any) ||
-										channel.name ||
-										'Unknown Artist',
+										(typeof channel.author === 'string'
+											? channel.author
+											: channel.author?.name) || 'Unknown Artist',
 								},
 							});
 						}
@@ -537,70 +385,6 @@ class MusicService {
 				searchType,
 				error: error instanceof Error ? error.message : String(error),
 			});
-		}
-
-		// For 'all' search, guarantee variety while maintaining relevance (Weighted Variety)
-		if (searchType === 'all' && results.length > 0) {
-			const seenIds = new Set<string>();
-			const uniqueResults: SearchResult[] = [];
-
-			// First pass: Filter duplicates and organize by type
-			const byType: Record<string, SearchResult[]> = {
-				song: [],
-				playlist: [],
-				artist: [],
-				album: [],
-			};
-
-			for (const r of results) {
-				const id =
-					r.type === 'song'
-						? (r.data as Track).videoId
-						: r.type === 'playlist'
-							? (r.data as Playlist).playlistId
-							: r.type === 'artist'
-								? (r.data as Artist).artistId
-								: (r.data as Album).albumId;
-
-				const uniqueId = `${r.type}:${id}`;
-				if (seenIds.has(uniqueId)) continue;
-				seenIds.add(uniqueId);
-
-				byType[r.type]?.push(r);
-				uniqueResults.push(r);
-			}
-
-			const balanced: SearchResult[] = [];
-			let remainingLimit = resultLimit;
-			const typesToInclude = ['artist', 'album', 'playlist'];
-			const includedFromTypes = new Set<string>();
-
-			// 1. Ensure at least one from each non-song type if available
-			for (const type of typesToInclude) {
-				const items = byType[type];
-				if (items && items.length > 0 && remainingLimit > 0) {
-					balanced.push(items[0]!);
-					includedFromTypes.add(`${type}:${0}`);
-					remainingLimit--;
-				}
-			}
-
-			// 2. Fill the rest with highest-ranked original results that aren't already included
-			for (const r of uniqueResults) {
-				if (remainingLimit <= 0) break;
-
-				const type = r.type;
-				const indexInType = byType[type]?.indexOf(r) ?? -1;
-				const typeKey = `${type}:${indexInType}`;
-
-				if (!includedFromTypes.has(typeKey)) {
-					balanced.push(r);
-					remainingLimit--;
-				}
-			}
-
-			results.length = 0;
-			results.push(...balanced);
 		}
 
 		const response: SearchResponse = {
@@ -622,99 +406,51 @@ class MusicService {
 		}
 
 		try {
+			// Validate the video exists by fetching basic info from YouTube
 			const yt = await getClient();
 			const info = await yt.getBasicInfo(normalizedVideoId);
-			const basicInfo = info.basic_info;
 
+			// Check if the video is actually playable
+			const status = info.playability_status?.status;
+			if (status && status !== 'OK') {
+				logger.warn('MusicService', 'Track not playable', {
+					videoId: normalizedVideoId,
+					status,
+					reason: info.playability_status?.reason,
+				});
+				return null;
+			}
+
+			const basicInfo = info.basic_info;
 			return {
 				videoId: normalizedVideoId,
 				title: basicInfo.title ?? 'Unknown Track',
 				artists: basicInfo.channel
 					? [
 							{
-								artistId: basicInfo.channel.id,
-								name: basicInfo.channel.name,
+								artistId: basicInfo.channel.id ?? '',
+								name: basicInfo.channel.name ?? 'Unknown',
 							},
 						]
-					: basicInfo.author
-						? [
-								{
-									artistId: basicInfo.channel_id ?? '',
-									name: basicInfo.author,
-								},
-							]
-						: [],
+					: [],
 				duration: basicInfo.duration ?? 0,
 			};
 		} catch (error) {
-			logger.warn(
-				'MusicService',
-				'getTrack: failed to fetch video info, using stub',
-				{
-					videoId: normalizedVideoId,
-					error: error instanceof Error ? error.message : String(error),
-				},
-			);
-
-			return {
+			logger.warn('MusicService', 'Failed to fetch track info', {
 				videoId: normalizedVideoId,
-				title: 'Unknown Track',
-				artists: [],
-			};
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return null;
 		}
 	}
 
 	async getAlbum(albumId: string): Promise<Album> {
-		try {
-			const yt = await getClient();
-			const albumData = (await yt.music.getAlbum(albumId)) as {
-				title?: string;
-				artists?: Array<{name?: string; channel_id?: string; id?: string}>;
-				contents?: Array<{
-					id?: string;
-					video_id?: string;
-					title?: string;
-					artists?: Array<{name?: string; channel_id?: string; id?: string}>;
-					duration?: number | {seconds?: number};
-				}>;
-			};
-			logger.debug('MusicService', 'getAlbum data', {albumData});
-			const tracks: Track[] = (albumData.contents || [])
-				.map(item => ({
-					videoId: item.video_id || item.id || '',
-					title: item.title || 'Unknown Title',
-					artists: (item.artists || []).map(a => ({
-						artistId: a.channel_id,
-						name: a.name,
-					})),
-					duration:
-						typeof item.duration === 'number'
-							? item.duration
-							: (item.duration?.seconds ?? 0),
-				}))
-				.filter(t => t.videoId !== '') as Track[];
-
-			return {
-				albumId,
-				name: albumData.title || 'Unknown Album',
-				artists: (albumData.artists || []).map(a => ({
-					artistId: a.channel_id,
-					name: a.name,
-				})),
-				tracks,
-			} as Album;
-		} catch (error) {
-			logger.error('MusicService', 'getAlbum failed', {
-				albumId,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			return {
-				albumId,
-				name: 'Unknown Album',
-				artists: [],
-				tracks: [],
-			};
-		}
+		return {
+			albumId,
+			name: 'Unknown Album',
+			artists: [],
+			tracks: [],
+		} as unknown as Album;
 	}
 
 	async getArtist(artistId: string): Promise<Artist> {
@@ -730,6 +466,9 @@ class MusicService {
 			const playlistData = (await yt.music.getPlaylist(playlistId)) as {
 				title?: string;
 				name?: string;
+				header?: {
+					title?: string | {text?: string};
+				};
 				contents?: Array<{
 					id?: string;
 					video_id?: string;
@@ -745,6 +484,15 @@ class MusicService {
 					duration?: number | {seconds?: number};
 				}>;
 			};
+
+			// Extract playlist name: try header.title first (youtubei.js Playlist class),
+			// then top-level title/name, fallback to 'Unknown Playlist'
+			const headerTitle = playlistData.header?.title;
+			const resolvedName =
+				(typeof headerTitle === 'string' ? headerTitle : headerTitle?.text) ||
+				playlistData.title ||
+				playlistData.name ||
+				'Unknown Playlist';
 
 			const rows = [
 				...(playlistData.contents ?? []),
@@ -775,7 +523,7 @@ class MusicService {
 
 			return {
 				playlistId,
-				name: playlistData.title || playlistData.name || 'Unknown Playlist',
+				name: resolvedName,
 				tracks,
 			};
 		} catch (error) {
@@ -942,6 +690,18 @@ class MusicService {
 	}
 
 	async getSuggestions(trackId: string): Promise<Track[]> {
+		const cache = getSuggestionsCache();
+		const cacheKey = `suggestions:${trackId}`;
+
+		const cached = cache.get(cacheKey) as Track[] | null;
+		if (cached) {
+			logger.debug('MusicService', 'Returning cached suggestions', {
+				trackId,
+				resultCount: cached.length,
+			});
+			return cached;
+		}
+
 		try {
 			const yt = await getClient();
 
@@ -979,12 +739,15 @@ class MusicService {
 				});
 			}
 
+			const result = tracks.slice(0, 15);
+			cache.set(cacheKey, result as unknown);
+
 			logger.debug('MusicService', 'getSuggestions success', {
 				trackId,
-				count: tracks.length,
+				count: result.length,
 			});
 
-			return tracks.slice(0, 15);
+			return result;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			logger.warn('MusicService', 'getSuggestions failed', {error: message});
@@ -1221,10 +984,8 @@ class MusicService {
 
 	async getStreamUrl(videoId: string): Promise<string> {
 		logger.info('MusicService', 'Starting stream extraction', {videoId});
-		const isBunRuntime =
-			typeof (globalThis as {Bun?: unknown}).Bun !== 'undefined';
 
-		// Try Method 0: youtubei.js ANDROID client (direct URLs, works on Bun)
+		// Method 0: youtubei.js ANDROID client (direct URLs, works on Bun)
 		try {
 			logger.debug('MusicService', 'Attempting ANDROID client extraction', {
 				videoId,
@@ -1247,12 +1008,11 @@ class MusicService {
 				}
 
 				if (format?.url) {
-					const url = `${format.url}&cpn=${info.cpn}`;
 					logger.info('MusicService', 'Using ANDROID client stream URL', {
-						bitrate: format.bitrate,
+						urlLength: format.url.length,
 						mimeType: format.mime_type,
 					});
-					return url;
+					return format.url;
 				}
 			}
 
@@ -1260,140 +1020,33 @@ class MusicService {
 		} catch (error) {
 			logger.error('MusicService', 'ANDROID client extraction failed', {
 				error: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
 			});
 		}
 
-		// Try Method 1: @distube/ytdl-core (skip under Bun due undici incompatibility)
-		if (isBunRuntime) {
-			logger.warn(
-				'MusicService',
-				'Skipping ytdl-core extraction on Bun runtime',
-				{videoId},
-			);
-		} else {
-			try {
-				logger.debug('MusicService', 'Attempting ytdl-core extraction', {
-					videoId,
-				});
-				const ytdl = await import('@distube/ytdl-core');
-				const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-				const info = await ytdl.default.getInfo(videoUrl);
-				logger.debug('MusicService', 'ytdl-core getInfo succeeded', {
-					formatCount: info.formats.length,
-				});
-
-				const audioFormats = ytdl.default.filterFormats(
-					info.formats,
-					'audioonly',
-				);
-				logger.debug('MusicService', 'ytdl-core audio formats filtered', {
-					audioFormatCount: audioFormats.length,
-				});
-
-				if (audioFormats.length > 0) {
-					// Get highest quality audio
-					const bestAudio = audioFormats.sort((a, b) => {
-						const aBitrate = Number.parseInt(String(a.audioBitrate || 0));
-						const bBitrate = Number.parseInt(String(b.audioBitrate || 0));
-						return bBitrate - aBitrate;
-					})[0];
-
-					if (bestAudio?.url) {
-						logger.info('MusicService', 'Using ytdl-core stream', {
-							bitrate: bestAudio.audioBitrate,
-							urlLength: bestAudio.url.length,
-							mimeType: bestAudio.mimeType,
-						});
-						return bestAudio.url;
-					}
-				}
-
-				logger.warn(
-					'MusicService',
-					'ytdl-core: No audio formats with URL found',
-				);
-			} catch (error) {
-				logger.error('MusicService', 'ytdl-core extraction failed', {
-					error: error instanceof Error ? error.message : String(error),
-					stack: error instanceof Error ? error.stack : undefined,
-				});
-			}
-		}
-
-		// Try Method 2: youtubei.js (uses already-initialized client)
+		// Method 1: youtubei.js (already used for search/metadata)
 		try {
 			logger.debug('MusicService', 'Attempting youtubei.js extraction', {
 				videoId,
 			});
 			const yt = await getClient();
 			const info = await yt.getBasicInfo(videoId);
+			const format = info.chooseFormat({
+				type: 'audio',
+				quality: 'best',
+			});
+			const streamUrl =
+				typeof format?.decipher === 'function'
+					? format.decipher(yt.session.player)
+					: format?.url;
 
-			if (info.streaming_data) {
-				const allFormats = [
-					...info.streaming_data.adaptive_formats,
-					...info.streaming_data.formats,
-				];
-
-				// Debug format counts for each filter stage
-				const withAudio = allFormats.filter(f => f.has_audio);
-				const noVideo = withAudio.filter(f => !f.has_video);
-				const noText = noVideo.filter(f => !f.has_text);
-				const original = noText.filter(f => f.is_original !== false);
-				const withUrl = original.filter(
-					f => f.url || f.signature_cipher || f.cipher,
-				);
-				logger.debug('MusicService', 'Format filter breakdown', {
-					total: allFormats.length,
-					hasAudio: withAudio.length,
-					noVideo: noVideo.length,
-					noText: noText.length,
-					original: original.length,
-					hasUrlOrCipher: withUrl.length,
+			if (streamUrl && typeof streamUrl === 'string') {
+				logger.info('MusicService', 'Using youtubei.js stream', {
+					urlLength: streamUrl.length,
 				});
-
-				// Pick best audio format
-				const bestAudio = withUrl.sort((a, b) => b.bitrate - a.bitrate)[0];
-
-				if (!bestAudio) {
-					logger.warn(
-						'MusicService',
-						'youtubei.js: No suitable audio format found',
-						{
-							total: allFormats.length,
-							sampleMimeTypes: allFormats.slice(0, 5).map(f => ({
-								mime: f.mime_type,
-								audio: f.has_audio,
-								video: f.has_video,
-								text: f.has_text,
-								original: f.is_original,
-								hasUrl: !!f.url,
-								hasCipher: !!f.signature_cipher,
-								bitrate: f.bitrate,
-							})),
-						},
-					);
-				} else {
-					const decipheredUrl = await bestAudio.decipher(
-						yt.actions.session.player,
-					);
-
-					if (decipheredUrl) {
-						logger.info('MusicService', 'Using youtubei.js stream URL', {
-							bitrate: bestAudio.bitrate,
-							quality: bestAudio.audio_quality,
-							mimeType: bestAudio.mime_type,
-						});
-						return decipheredUrl;
-					}
-				}
-			} else {
-				logger.warn(
-					'MusicService',
-					'youtubei.js: No streaming_data in response',
-				);
+				return streamUrl;
 			}
+
+			logger.warn('MusicService', 'youtubei.js: No audio format URL found');
 		} catch (error) {
 			logger.error('MusicService', 'youtubei.js extraction failed', {
 				error: error instanceof Error ? error.message : String(error),
@@ -1401,56 +1054,7 @@ class MusicService {
 			});
 		}
 
-		// Try Method 3: youtube-ext (lightweight, no parser path)
-		try {
-			logger.debug('MusicService', 'Attempting youtube-ext extraction', {
-				videoId,
-			});
-			const {videoInfo, getFormats} = await import('youtube-ext');
-			const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-			const info = await videoInfo(videoUrl);
-			logger.debug('MusicService', 'youtube-ext videoInfo succeeded');
-
-			// Decode stream URLs first
-			const decodedFormats = await getFormats(info.stream);
-			logger.debug('MusicService', 'youtube-ext formats decoded', {
-				formatCount: decodedFormats.length,
-			});
-
-			// Get best audio format from decoded adaptive formats
-			const audioFormats = decodedFormats.filter(
-				f => f.mimeType?.includes('audio') && f.url,
-			);
-			logger.debug('MusicService', 'youtube-ext audio formats filtered', {
-				audioFormatCount: audioFormats.length,
-			});
-
-			if (audioFormats.length > 0) {
-				// Sort by bitrate descending and get best quality
-				const bestAudio = audioFormats.sort(
-					(a, b) => (b.bitrate || 0) - (a.bitrate || 0),
-				)[0];
-				if (bestAudio?.url) {
-					logger.info('MusicService', 'Using youtube-ext stream', {
-						bitrate: bestAudio.bitrate,
-						urlLength: bestAudio.url.length,
-					});
-					return bestAudio.url;
-				}
-			}
-
-			logger.warn(
-				'MusicService',
-				'youtube-ext: No audio formats with URL found',
-			);
-		} catch (error) {
-			logger.error('MusicService', 'youtube-ext extraction failed', {
-				error: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-		}
-
-		// Try Method 4: Invidious API (last resort)
+		// Method 2: Invidious API (last resort)
 		try {
 			logger.debug('MusicService', 'Attempting Invidious extraction', {
 				videoId,
@@ -1467,7 +1071,6 @@ class MusicService {
 			});
 		}
 
-		// All methods failed
 		logger.error('MusicService', 'All stream extraction methods failed', {
 			videoId,
 		});
@@ -1475,19 +1078,19 @@ class MusicService {
 	}
 
 	private async getInvidiousStreamUrl(videoId: string): Promise<string> {
-		// Try multiple Invidious instances as fallback
-		const instances = [
-			'https://vid.puffyan.us',
-			'https://invidious.perennialte.ch',
-			'https://yewtu.be',
-		];
+		const health = getInvidiousHealthService();
+		const instances = await health.ensureFreshInstances();
 
 		for (const instance of instances) {
+			const startedAt = Date.now();
 			try {
 				logger.debug('MusicService', 'Trying Invidious instance', {instance});
-				const response = await fetch(`${instance}/api/v1/videos/${videoId}`);
+				const response = await fetch(`${instance}/api/v1/videos/${videoId}`, {
+					signal: AbortSignal.timeout(12_000),
+				});
 
 				if (!response.ok) {
+					health.recordFailure(instance);
 					logger.debug('MusicService', 'Invidious instance returned non-OK', {
 						instance,
 						status: response.status,
@@ -1500,7 +1103,6 @@ class MusicService {
 					formatStreams?: Array<{url?: string; type?: string}>;
 				};
 
-				// Look for audio-only streams
 				const audioFormats = [
 					...(videoData.adaptiveFormats || []),
 					...(videoData.formatStreams || []),
@@ -1514,6 +1116,7 @@ class MusicService {
 				if (audioFormats.length > 0) {
 					const firstAudio = audioFormats[0];
 					if (firstAudio?.url) {
+						health.recordSuccess(instance, Date.now() - startedAt);
 						logger.debug('MusicService', 'Invidious stream URL obtained', {
 							instance,
 							urlLength: firstAudio.url.length,
@@ -1522,72 +1125,19 @@ class MusicService {
 						return firstAudio.url;
 					}
 				}
+
+				health.recordFailure(instance);
 			} catch (error) {
+				health.recordFailure(instance);
 				logger.debug('MusicService', 'Invidious instance error', {
 					instance,
 					error: error instanceof Error ? error.message : String(error),
 				});
-				// Try next instance
 				continue;
 			}
 		}
 
-		// If all Invidious instances fail, throw error instead of returning watch URL
 		throw new Error('No Invidious instance returned a valid stream URL');
-	}
-
-	/**
-	 * Get a ReadableStream for a video, fetched through the youtubei.js session
-	 * (which has the cookies and headers needed to avoid 403 from YouTube's CDN).
-	 */
-	async getStreamBody(videoId: string): Promise<ReadableStream<Uint8Array>> {
-		const yt = await getAndroidClient();
-		const info = await yt.getBasicInfo(videoId);
-
-		if (!info.streaming_data) {
-			throw new Error('No streaming data in response');
-		}
-
-		const allFormats = [
-			...info.streaming_data.adaptive_formats,
-			...info.streaming_data.formats,
-		];
-
-		// Prefer audio-only with a direct URL
-		let format = allFormats.find(
-			f => f.has_audio && !f.has_video && !f.has_text && f.url,
-		);
-
-		// Fall back to any audio format with a direct URL
-		if (!format) {
-			format = allFormats.find(f => f.has_audio && f.url);
-		}
-
-		if (!format) {
-			throw new Error('No audio format with a direct URL found');
-		}
-
-		const url = `${format.url}&cpn=${info.cpn}`;
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: {
-				accept: '*/*',
-				origin: 'https://www.youtube.com',
-				referer: 'https://www.youtube.com',
-				Range: 'bytes=0-',
-			},
-			redirect: 'follow',
-		});
-
-		if (!response.ok) {
-			throw new Error(`Stream fetch failed: ${response.status}`);
-		}
-
-		if (!response.body) {
-			throw new Error('No body in stream response');
-		}
-
-		return response.body;
 	}
 }
 

@@ -30,7 +30,9 @@ A powerful Terminal User Interface (TUI) music player for YouTube Music
 - 🔌 **Plugin System** - Extend functionality with plugins
 - ⌨️ **Keyboard-Driven** - Efficient vim-style navigation
 - 🖥️ **Immersive Mode** - Fullscreen Windows TUI with audio visualizer and disco effects
+- 🌐 **Web Companion** - Browser UI with synced playback controls (`--web`); included in every production build
 - 💾 **Downloads** - Save tracks/playlists/artists with `Shift+D`
+- 📊 **Listening Stats** - Press `o` for totals, top tracks/artists, streaks; share with `S` / `E` or `ymc stats --share`
 - 🏷️ **Metadata Tagging** - Auto-tag title/artist/album with optional cover art
 - ⚡️ **Shell Completions** - `ymc completions <bash|zsh|powershell|fish>` emits scripts you can source or save so the CLI (also available as `ymc`) tab-completes subcommands and flags
 
@@ -46,7 +48,13 @@ Your support helps keep this project alive and improving!
 
 ## Roadmap
 
-Visit [`SUGGESTIONS.md`](SUGGESTIONS.md) for the full backlog and use `docs/roadmap.md` to understand the current implementation focus (crossfade + gapless playback) and the next steps planned for equalizer/enhancements. The roadmap doc also explains how to pick up work so reviewers and contributors remain aligned.
+**0.1.0** is out — [celebratory notes](docs/releases/v0.1.0.md). Visit [`SUGGESTIONS.md`](SUGGESTIONS.md) for the backlog and [`docs/roadmap.md`](docs/roadmap.md) for post-0.1.0 focus (hardening, discovery, offline, web v1.1).
+
+## What's new in 0.1.0
+
+- Bundled **web companion** (`--web` / `--web-only`) — no extra build step
+- Live streams + radio, Win32 immersive, and playback reliability fixes from the 0.0.x centennial era
+- Full highlight reel: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md)
 
 ## Prerequisites
 
@@ -98,18 +106,39 @@ sudo dnf install mpv yt-dlp
 
 ## Installation
 
-### Node.js (Recommended)
+### Install Script (standalone binary — no Node/Bun required)
 
-Requires [Node.js](https://nodejs.org) 18+ installed.
+Downloads the latest GitHub Release binary into `~/.local/bin` (Windows: `%USERPROFILE%\.local\bin`). Falls back to bun/npm if the download fails. Use `--from-npm` to skip the binary and install from the registry.
 
 ```bash
-npm install -g @involvex/youtube-music-cli
+curl -fsSL https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/install.sh | bash
 ```
 
-### Bun
+```powershell
+iwr https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/install.ps1 | iex
+```
+
+### GitHub Releases
+
+Manual download: https://github.com/involvex/youtube-music-cli/releases
+
+Release assets (prefer the platform-specific name; install scripts fall back to legacy names):
+
+| Platform            | Asset                                                                 |
+| ------------------- | --------------------------------------------------------------------- |
+| Windows x64         | `youtube-music-cli-windows-x64.exe` (legacy: `youtube-music-cli.exe`) |
+| Linux x64           | `youtube-music-cli-linux-x64` (legacy: `youtube-music-cli`)           |
+| macOS Apple Silicon | `youtube-music-cli-darwin-arm64`                                      |
+| macOS Intel         | `youtube-music-cli-darwin-x64`                                        |
+
+Immersive Win32 build (`ymc-win32.exe`) is separate (`bun run build:win32`) and is not the default install-script binary.
+
+### Package managers (bun / npm)
 
 ```bash
 bun install -g @involvex/youtube-music-cli
+# or
+npm install -g @involvex/youtube-music-cli
 ```
 
 ### Homebrew
@@ -117,24 +146,6 @@ bun install -g @involvex/youtube-music-cli
 ```bash
 brew tap involvex/youtube-music-cli https://github.com/involvex/youtube-music-cli.git
 brew install youtube-music-cli
-```
-
-### GitHub Releases
-
-```bash
-https://github.com/involvex/youtube-music-cli/releases
-```
-
-### Install Script (bash)
-
-```bash
-curl -fssl https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/install.sh | bash
-```
-
-### Install Script (PowerShell)
-
-```powershell
-iwr https://raw.githubusercontent.com/involvex/youtube-music-cli/main/scripts/install.ps1 | iex
 ```
 
 ### From Source
@@ -205,6 +216,23 @@ bun run build:win32
 dist/ymc-win32.exe
 ```
 
+### Web Companion UI
+
+Every production build (`bun run build`) includes the browser companion at `dist/web/`. No separate `build:web` step is required for users.
+
+```bash
+# TUI + web UI (default http://localhost:8080)
+youtube-music-cli --web
+
+# Web UI only (no terminal interface)
+youtube-music-cli --web-only
+
+# Custom host/port and optional auth token
+youtube-music-cli --web --web-host 0.0.0.0 --web-port 3000 --web-auth secret
+```
+
+Open the printed URL in a browser for synced playback controls, queue, search, volume, shuffle/repeat/autoplay, and dark/light theme. State stays in sync with the CLI over WebSocket (`/ws`).
+
 **Hotkeys in Immersive Mode:**
 
 | Key        | Action                                       |
@@ -239,6 +267,12 @@ The footer shows shuffle/repeat/disco status on one line and prioritized shortcu
 
 Global media keys (Alt+Media keys) also work when the terminal is unfocused on Windows with Bun runtime.
 
+**Troubleshooting immersive playback**
+
+- **Track info shows but time does not move / no audio:** Press `Space` to resume. Immersive auto-starts the last session; if mpv was paused externally (screen share, focus loss), the UI now syncs to `PAUSED` — press `Space` again.
+- **Screen sharing (Discord, Teams, OBS):** Remote viewers often do not hear your PC audio unless you enable “share computer sound” / system audio capture. That is a Windows capture limitation, not the player routing audio only to you.
+- **Requires Bun for Win32 native features:** Global hotkeys and native console title use `@bun-win32/*` via Bun. Run with `bun run dev:win32` or the compiled `ymc-win32.exe` binary.
+
 ### Shell completions
 
 Generate shell completion helpers through the lightweight `ymc` alias that ships with the CLI. Run `ymc completions <bash|zsh|powershell|fish>` to print the completion script for your shell, then source it or persist it in your profile:
@@ -270,6 +304,11 @@ If you installed the CLI globally with an alias or script name, make sure `ymc` 
 | `--shuffle`  | `-s`  | Enable shuffle mode                          |
 | `--repeat`   | `-r`  | Repeat mode: `off`, `all`, `one`             |
 | `--headless` |       | Run without TUI                              |
+| `--web`      |       | Enable web companion UI (bundled in build)   |
+| `--web-only` |       | Web UI only (no TUI)                         |
+| `--web-host` |       | Web server host (default: `localhost`)       |
+| `--web-port` |       | Web server port (default: `8080`)            |
+| `--web-auth` |       | Optional auth token for the web server       |
 | `--win32`    |       | Immersive fullscreen mode (Windows only)     |
 | `--help`     | `-h`  | Show help                                    |
 
@@ -296,6 +335,7 @@ youtube-music-cli play dQw4w9WgXcQ --shuffle
 | `/`       | Search          |
 | `p`       | Plugins manager |
 | `Shift+F` | Favorites view  |
+| `o`       | Listening stats |
 | `g`       | Suggestions     |
 | `,`       | Settings        |
 | `Esc`     | Go back         |
@@ -417,8 +457,9 @@ Config is stored in `~/.youtube-music-cli/config.json`:
 - Set your download directory in **Settings → Download Folder**.
 - Choose format in **Settings → Download Format** (`mp3` or `m4a`).
 - Downloads are saved as:
-  - `<downloadDirectory>/<artist>/<album>/<title>.mp3` (or `.m4a`)
+  - `<downloadDirectory>/<artist>/<album>/<title> [<videoId>].mp3` (or `.m4a`)
 - MP3/M4A files are tagged with metadata (`title`, `artist`, `album`) and include cover art when available.
+- When a track is available on disk, playback prefers the local file (`preferLocalPlayback`, default `true`; Settings toggle). An index is kept at `~/.youtube-music-cli/downloads-index.json`. Legacy title-only filenames are still detected.
 
 ## Troubleshooting
 

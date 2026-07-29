@@ -8,6 +8,19 @@ import {getImportService} from '../import/import.service.ts';
 import {getPlayerService} from '../player/player.service.ts';
 import {getSearchService} from '../youtube-music/search.service.ts';
 import {logger} from '../logger/logger.service.ts';
+import {resolveTrackPlayUrl} from '../../utils/local-track.ts';
+import type {Track} from '../../types/youtube-music.types.ts';
+import type {RadioStation} from '../../types/radio-station.types.ts';
+import {
+	getLiveStreams,
+	toRadioStation,
+} from '../live-streams/live-streams.service.ts';
+import {
+	loadBrowseStations,
+	loadSearchStations,
+	flattenRadioStations,
+} from '../radio-stations/radio-stations.service.ts';
+import {getFavoritesManager} from '../favorites/favorites.service.ts';
 
 class WebServerManager {
 	private config: WebServerConfig;
@@ -34,6 +47,11 @@ class WebServerManager {
 		subtitle: null,
 		radioIsActive: false,
 		radioSeed: null,
+		explicitQueueLength: 0,
+		playbackMode: 'youtube',
+		currentStation: null,
+		streamNowPlaying: null,
+		mediaSource: null,
 	};
 
 	constructor() {
@@ -104,6 +122,10 @@ class WebServerManager {
 				onImportRequest: this.handleImportRequest.bind(this),
 				onSearchRequest: this.handleSearchRequest.bind(this),
 				onConfigUpdate: this.handleConfigUpdate.bind(this),
+				onLiveStreamsRequest: this.handleLiveStreamsRequest.bind(this),
+				onRadioSearchRequest: this.handleRadioSearchRequest.bind(this),
+				onFavoritesRequest: this.handleFavoritesRequest.bind(this),
+				onFavoritesToggle: this.handleFavoritesToggle.bind(this),
 			});
 
 			this.isRunning = true;
@@ -173,11 +195,25 @@ class WebServerManager {
 	/**
 	 * Handle command from web client
 	 */
+	private playTrackMedia(track: Track): void {
+		const config = getConfigService();
+		const resolved = resolveTrackPlayUrl(track, {
+			preferLocal: config.get('preferLocalPlayback') ?? true,
+			downloadDirectory: config.get('downloadDirectory'),
+			downloadFormat: config.get('downloadFormat') ?? 'mp3',
+		});
+		this.internalState.mediaSource = resolved.source;
+		void getPlayerService().play(resolved.url, {
+			volume: this.internalState.volume,
+			volumeFadeDuration: config.get('volumeFadeDuration'),
+			trackId: track.videoId,
+		});
+	}
+
 	private handleCommand(action: PlayerAction): void {
 		logger.debug('WebServerManager', 'Executing command from client', {action});
 
 		const playerService = getPlayerService();
-		const config = getConfigService();
 
 		// Execute command and update internal state
 		switch (action.category) {
@@ -188,28 +224,58 @@ class WebServerManager {
 					this.internalState.progress = 0;
 					this.internalState.error = null;
 
-					const youtubeUrl = `https://www.youtube.com/watch?v=${action.track.videoId}`;
-					void playerService.play(youtubeUrl, {
-						volume: this.internalState.volume,
-						volumeFadeDuration: config.get('volumeFadeDuration'),
-					});
+					this.playTrackMedia(action.track);
 				}
 				break;
 			}
 			case 'PAUSE':
 				this.internalState.isPlaying = false;
-				playerService.pause();
+				void playerService.pause();
 				break;
 			case 'RESUME':
 				this.internalState.isPlaying = true;
-				playerService.resume();
+				void playerService.resume();
 				break;
 			case 'STOP':
 				this.internalState.isPlaying = false;
 				this.internalState.progress = 0;
 				this.internalState.currentTrack = null;
+				this.internalState.playbackMode = 'youtube';
+				this.internalState.currentStation = null;
+				this.internalState.streamNowPlaying = null;
 				playerService.stop();
 				break;
+			case 'PLAY_STREAM': {
+				if (action.station) {
+					const station = action.station;
+					this.internalState.playbackMode = 'stream';
+					this.internalState.currentStation = station;
+					this.internalState.streamNowPlaying = null;
+					this.internalState.mediaSource = null;
+					this.internalState.currentTrack = null;
+					this.internalState.queue = [];
+					this.internalState.queuePosition = 0;
+					this.internalState.explicitQueueLength = 0;
+					this.internalState.radioIsActive = false;
+					this.internalState.autoplay = false;
+					this.internalState.isPlaying = true;
+					this.internalState.progress = 0;
+					this.internalState.error = null;
+
+					const config = getConfigService();
+					void playerService.play(station.streamUrl, {
+						volume: this.internalState.volume,
+						trackId: station.id,
+						audioNormalization: config.get('audioNormalization') ?? false,
+						proxy: config.get('proxy'),
+						gaplessPlayback: config.get('gaplessPlayback') ?? true,
+						crossfadeDuration: config.get('crossfadeDuration') ?? 0,
+						equalizerPreset: config.get('equalizerPreset') ?? 'flat',
+						volumeFadeDuration: config.get('volumeFadeDuration') ?? 0,
+					});
+				}
+				break;
+			}
 			case 'NEXT': {
 				if (this.internalState.queue.length === 0) break;
 
@@ -241,11 +307,7 @@ class WebServerManager {
 				this.internalState.progress = 0;
 
 				if (this.internalState.currentTrack) {
-					const youtubeUrl = `https://www.youtube.com/watch?v=${this.internalState.currentTrack.videoId}`;
-					void playerService.play(youtubeUrl, {
-						volume: this.internalState.volume,
-						volumeFadeDuration: config.get('volumeFadeDuration'),
-					});
+					this.playTrackMedia(this.internalState.currentTrack);
 				}
 				break;
 			}
@@ -444,6 +506,111 @@ class WebServerManager {
 				error: error instanceof Error ? error.message : String(error),
 			});
 		}
+	}
+
+	/**
+	 * Handle live streams list request from web client
+	 */
+	private handleLiveStreamsRequest(): void {
+		try {
+			const stations: RadioStation[] = getLiveStreams().map(entry =>
+				toRadioStation(entry),
+			);
+
+			const streamingService = getWebStreamingService();
+			streamingService.broadcast({
+				type: 'live-streams-list',
+				stations,
+			});
+		} catch (error) {
+			logger.error('WebServerManager', 'Live streams request failed', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	/**
+	 * Handle radio station search/browse request from web client
+	 */
+	private async handleRadioSearchRequest(
+		query: string,
+		countrycode?: string,
+	): Promise<void> {
+		logger.info('WebServerManager', 'Radio search request from client', {
+			query,
+			countrycode,
+		});
+
+		try {
+			const list = query.trim()
+				? await loadSearchStations(query)
+				: await loadBrowseStations({countrycode});
+			const stations = flattenRadioStations(list);
+
+			const streamingService = getWebStreamingService();
+			streamingService.broadcast({
+				type: 'radio-search-results',
+				stations,
+			});
+		} catch (error) {
+			logger.error('WebServerManager', 'Radio search failed', {
+				query,
+				countrycode,
+				error: error instanceof Error ? error.message : String(error),
+			});
+
+			const streamingService = getWebStreamingService();
+			streamingService.sendError(
+				'Radio station search failed. Please try again.',
+				'RADIO_SEARCH_FAILED',
+			);
+		}
+	}
+
+	/**
+	 * Broadcast the current favorites list to web clients
+	 */
+	private async broadcastFavoritesList(): Promise<void> {
+		const favorites = getFavoritesManager();
+		await favorites.ensureLoaded();
+		const streamingService = getWebStreamingService();
+		streamingService.broadcast({
+			type: 'favorites-list',
+			tracks: favorites.getAllTracks(),
+		});
+	}
+
+	/**
+	 * Handle favorites list request from web client
+	 */
+	private handleFavoritesRequest(): void {
+		void this.broadcastFavoritesList().catch(error => {
+			logger.error('WebServerManager', 'Favorites request failed', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		});
+	}
+
+	/**
+	 * Handle favorite toggle (add/remove) from web client
+	 */
+	private handleFavoritesToggle(track: Track): void {
+		void (async () => {
+			try {
+				const favorites = getFavoritesManager();
+				await favorites.toggle(track);
+				await this.broadcastFavoritesList();
+			} catch (error) {
+				logger.error('WebServerManager', 'Favorites toggle failed', {
+					videoId: track.videoId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+				getWebStreamingService().sendError(
+					'Failed to update favorites. Please try again.',
+					'FAVORITES_TOGGLE_FAILED',
+				);
+			}
+		})();
 	}
 
 	/**

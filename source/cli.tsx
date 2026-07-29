@@ -16,11 +16,19 @@ import {
 } from './services/completions/completions.service.ts';
 import {getConfigService} from './services/config/config.service.ts';
 import {getPlayerService} from './services/player/player.service.ts';
+import {
+	showLogs,
+	openLogs,
+	showLogPath,
+	setLogPath,
+} from './services/logs/logs-handler.ts';
+import {runConfigDoctor} from './services/config/config-doctor.ts';
 import {APP_VERSION} from './utils/constants.ts';
 import {ensurePlaybackDependencies} from './services/player/dependency-check.service.ts';
 import {getMusicService} from './services/youtube-music/api.ts';
 import type {Track} from './types/youtube-music.types.ts';
 import {logger} from './services/logger/logger.service.ts';
+import {resolveTrackPlayUrl} from './utils/local-track.ts';
 
 // Global error handlers to prevent crashes from unhandled rejections/exceptions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +82,21 @@ const cli = meow(
 	  $ youtube-music-cli import spotify <url-or-id>
 	  $ youtube-music-cli import youtube <url-or-id>
 
+	📋 Logs Commands
+	  $ youtube-music-cli logs                    Show recent debug logs
+	  $ youtube-music-cli logs --open             Open log file in default editor
+	  $ youtube-music-cli logs --get-path         Print log file path
+	  $ youtube-music-cli logs --set-path <path>  Set custom log file path
+
+	📊 Stats Commands
+	  $ youtube-music-cli stats                   Print listening statistics
+	  $ youtube-music-cli stats --share           Print + copy share card
+	  $ youtube-music-cli stats --export [path]   Write share card to file
+
+	🔧 Config Commands
+	  $ youtube-music-cli config doctor           Check config for issues
+	  $ youtube-music-cli config doctor --fix     Auto-fix config issues
+
 	⚙️  Options
 	  --theme, -t          Theme to use (dark, light, midnight, matrix, etc.)
 	  --volume, -v         Initial volume (0-100)
@@ -87,7 +110,8 @@ const cli = meow(
 	  --web-port           Web server port (default: 8080)
 	  --web-only           Run web server without CLI UI
 	  --web-auth           Authentication token for web server
-	  --name               Custom name for imported playlist
+	--name               Custom name for imported playlist
+	  --verbose, -V        Enable verbose logging output
 	  --help, -h           Show this help
 
 	🐚 Shell Completions
@@ -104,7 +128,7 @@ const cli = meow(
 	  $ youtube-music-cli plugins install adblock
 	  $ youtube-music-cli import spotify "https://open.spotify.com/playlist/..."
 	  $ youtube-music-cli --web --web-port 3000
-	  $ youtube-music-cli completions powershell | Out-File $PROFILE
+	  $ youtube-music-cli completions powershell | Out-String | Invoke-Expression
 `,
 	{
 		importMeta: import.meta,
@@ -165,6 +189,37 @@ const cli = meow(
 				shortFlag: 'h',
 				default: false,
 			},
+			// Logs command flags
+			open: {
+				type: 'boolean',
+				default: false,
+			},
+			getPath: {
+				type: 'boolean',
+				default: false,
+			},
+			setPath: {
+				type: 'string',
+			},
+			// Config doctor flags
+			fix: {
+				type: 'boolean',
+				default: false,
+			},
+			// Verbose logging flag
+			verbose: {
+				type: 'boolean',
+				shortFlag: 'V',
+				default: false,
+			},
+			// Stats command flags
+			share: {
+				type: 'boolean',
+				default: false,
+			},
+			export: {
+				type: 'string',
+			},
 		},
 		autoVersion: true,
 		autoHelp: false,
@@ -175,9 +230,72 @@ if (cli.flags.help) {
 	cli.showHelp(0);
 }
 
+// Enable verbose mode if --verbose flag is passed
+if (cli.flags.verbose) {
+	logger.setVerbose(true);
+}
+
 // Handle plugin commands
 const command = cli.input[0];
 const args = cli.input.slice(1);
+
+// Handle logs command
+if (command === 'logs') {
+	if (cli.flags.open) {
+		openLogs();
+	} else if (cli.flags.getPath) {
+		showLogPath();
+	} else if (cli.flags.setPath) {
+		setLogPath(cli.flags.setPath);
+	} else {
+		showLogs();
+	}
+}
+
+// Handle stats command
+if (command === 'stats') {
+	const {loadHistory} = await import('./services/history/history.service.ts');
+	const {computeStats} = await import('./services/stats/stats.service.ts');
+	const {
+		STATS_SHARE_DEFAULT_PATH,
+		copyTextToClipboard,
+		formatStatsShareCard,
+		writeStatsShareFile,
+	} = await import('./services/stats/stats-share.ts');
+
+	const entries = await loadHistory();
+	const stats = computeStats(entries);
+	const card = formatStatsShareCard(stats);
+	console.log(card);
+
+	if (cli.flags.share) {
+		const copied = await copyTextToClipboard(card);
+		console.log(
+			copied
+				? '\n(Copied share card to clipboard)'
+				: '\n(Clipboard unavailable — use --export to write a file)',
+		);
+	}
+
+	const exportFlag = cli.flags.export as string | undefined;
+	const wantsExport =
+		exportFlag !== undefined || process.argv.includes('--export');
+	if (wantsExport) {
+		const outPath =
+			typeof exportFlag === 'string' && exportFlag.length > 0
+				? exportFlag
+				: STATS_SHARE_DEFAULT_PATH;
+		const written = await writeStatsShareFile(card, outPath);
+		console.log(`\nExported share card to ${written}`);
+	}
+
+	process.exit(0);
+}
+
+// Handle config doctor command
+if (command === 'config' && args[0] === 'doctor') {
+	runConfigDoctor(cli.flags.fix);
+}
 
 const isInteractiveTerminal = Boolean(
 	process.stdin.isTTY && process.stdout.isTTY,
@@ -214,6 +332,9 @@ async function runDirectPlaybackCommand(flags: Flags): Promise<void> {
 		volume: flags.volume ?? config.get('volume'),
 		audioNormalization: config.get('audioNormalization'),
 		volumeFadeDuration: config.get('volumeFadeDuration'),
+		proxy: config.get('proxy'),
+		cookiesFile: config.get('cookiesFile'),
+		cookiesFromBrowser: config.get('cookiesFromBrowser'),
 	};
 
 	const isDirectAudioUrl = (url: string): boolean => {
@@ -265,8 +386,15 @@ async function runDirectPlaybackCommand(flags: Flags): Promise<void> {
 				? track.artists.map(artist => artist.name).join(', ')
 				: 'Unknown Artist';
 		console.log(`Playing: ${track.title} — ${artists}`);
-		const youtubeUrl = `https://www.youtube.com/watch?v=${track.videoId}`;
-		await playerService.play(youtubeUrl, playbackOptions);
+		const resolved = resolveTrackPlayUrl(track, {
+			preferLocal: getConfigService().get('preferLocalPlayback') ?? true,
+			downloadDirectory: getConfigService().get('downloadDirectory'),
+			downloadFormat: getConfigService().get('downloadFormat') ?? 'mp3',
+		});
+		if (resolved.source === 'local') {
+			console.log(`Source: local file (${resolved.url})`);
+		}
+		await playerService.play(resolved.url, playbackOptions);
 	}
 }
 
