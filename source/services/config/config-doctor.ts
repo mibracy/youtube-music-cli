@@ -18,7 +18,7 @@ function validateVolume(volume: number): ConfigIssue | null {
 			message: `Volume must be between 0 and 100, got: ${volume}`,
 			fix: () => {
 				const config = getConfigService();
-				config.setSync('volume', 70);
+				config.set('volume', 70);
 			},
 		};
 	}
@@ -44,7 +44,7 @@ function validateTheme(theme: string): ConfigIssue | null {
 			message: `Invalid theme: "${theme}". Valid themes: ${validThemes.join(', ')}`,
 			fix: () => {
 				const config = getConfigService();
-				config.setSync('theme', 'dark');
+				config.set('theme', 'dark');
 			},
 		};
 	}
@@ -60,7 +60,7 @@ function validateRepeat(repeat: string): ConfigIssue | null {
 			message: `Invalid repeat mode: "${repeat}". Valid modes: ${validRepeat.join(', ')}`,
 			fix: () => {
 				const config = getConfigService();
-				config.setSync('repeat', 'off');
+				config.set('repeat', 'off');
 			},
 		};
 	}
@@ -91,7 +91,7 @@ function validateConfigFile(): ConfigIssue | null {
 			message: 'Config file does not exist (using defaults)',
 			fix: () => {
 				const config = getConfigService();
-				config.setSync('theme', config.get('theme'));
+				config.set('theme', config.get('theme'));
 			},
 		};
 	}

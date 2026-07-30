@@ -31,6 +31,8 @@ export interface Config {
 	playlists: Playlist[];
 	history: string[];
 	searchHistory: string[];
+	/** @deprecated Legacy favorites from config.json - migrated to favorites.json */
+	favorites?: string[];
 	repeat: RepeatMode;
 	shuffle: boolean;
 	customTheme?: Theme;

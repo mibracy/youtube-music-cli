@@ -242,7 +242,7 @@ export function saveSettingsTextField(
 			}
 			try {
 				const normalized = ensureDownloadDirectory(trimmed);
-				config.setSync('downloadDirectory', normalized);
+				config.set('downloadDirectory', normalized);
 				if (!(config.get('downloadsEnabled') ?? false)) {
 					return 'Saved download folder (enable Download Feature to use)';
 				}

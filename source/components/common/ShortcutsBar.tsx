@@ -3,7 +3,7 @@ import {useState} from 'react';
 import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {ICONS} from '../../utils/icons.ts';

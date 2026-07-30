@@ -10,16 +10,12 @@ import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {useSleepTimer} from '../../hooks/useSleepTimer.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {formatTime} from '../../utils/format.ts';
-import {ensureDownloadDirectory} from '../../utils/download-path.ts';
 import type {
 	CookiesFromBrowser,
 	DownloadFormat,
 	EqualizerPreset,
 } from '../../types/config.types.ts';
-import {
-	formatCookiesFromBrowserLabel,
-	nextCookiesFromBrowser,
-} from '../../services/player/ytdl-cookies.ts';
+import {nextCookiesFromBrowser} from '../../services/player/ytdl-cookies.ts';
 
 const QUALITIES: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
 const DOWNLOAD_FORMATS: DownloadFormat[] = ['mp3', 'm4a'];
@@ -119,9 +115,6 @@ export default function Settings() {
 	const [cookiesFromBrowser, setCookiesFromBrowser] = useState<
 		CookiesFromBrowser | undefined
 	>(config.get('cookiesFromBrowser'));
-	const [cookiesFile, setCookiesFile] = useState(
-		config.get('cookiesFile') ?? '',
-	);
 	const [isEditingCookiesFile, setIsEditingCookiesFile] = useState(false);
 	const [llmEnabled, setLLMEnabled] = useState(config.getLLMEnabled());
 	const [llmApiKey, setLLMApiKey] = useState(config.getLLMApiKey() ?? '');
@@ -139,9 +132,6 @@ export default function Settings() {
 	);
 	const [isEditingDownloadDirectory, setIsEditingDownloadDirectory] =
 		useState(false);
-	const [downloadFolderFeedback, setDownloadFolderFeedback] = useState<
-		string | null
-	>(null);
 	const [isEditingApiKey, setIsEditingApiKey] = useState(false);
 	const [isEditingBaseUrl, setIsEditingBaseUrl] = useState(false);
 	const {
@@ -603,206 +593,6 @@ export default function Settings() {
 					▼ {SETTINGS_ITEMS.length - scrollOffset - maxVisible} more
 				</Text>
 			)}
-			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
-		}
-	};
-
-	const goBack = useCallback(() => {
-		dispatch({category: 'GO_BACK'});
-	}, [dispatch]);
-
-	useKeyBinding(KEYBINDINGS.UP, navigateUp);
-	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
-	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
-	useKeyBinding(KEYBINDINGS.BACK, goBack);
-
-	const sleepTimerLabel =
-		isActive && remainingSeconds !== null
-			? `Sleep Timer: ${formatTime(remainingSeconds)} remaining (Enter to cancel)`
-			: 'Sleep Timer: Off (Enter to set)';
-
-	const renderSettingItem = (actualIndex: number, isSelected: boolean) => {
-		const bg = isSelected ? theme.colors.highlight : undefined;
-
-		const box = (content: string) => (
-			<Box key={actualIndex} paddingX={1}>
-				<Text backgroundColor={bg} color={theme.colors.text} bold={isSelected}>
-					{content}
-				</Text>
-			</Box>
-		);
-
-		switch (actualIndex) {
-			case 0:
-				return box(
-					`Theme: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`,
-				);
-			case 1:
-				return box(`Stream Quality: ${quality.toUpperCase()}`);
-			case 2:
-				return box(`Audio Normalization: ${audioNormalization ? 'ON' : 'OFF'}`);
-			case 3:
-				return box(`Gapless Playback: ${gaplessPlayback ? 'ON' : 'OFF'}`);
-			case 4:
-				return box(
-					`Crossfade: ${crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}`,
-				);
-			case 5:
-				return box(
-					`Volume Fade: ${volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}`,
-				);
-			case 6:
-				return box(`Equalizer: ${formatEqualizerLabel(equalizerPreset)}`);
-			case 7:
-				return box(`Subtitles: ${subtitlesEnabled ? 'ON' : 'OFF'}`);
-			case 8:
-				return box(`Desktop Notifications: ${notifications ? 'ON' : 'OFF'}`);
-			case 9:
-				return box(`Discord Rich Presence: ${discordRpc ? 'ON' : 'OFF'}`);
-			case 10:
-				return box(`AI Assistant: ${llmEnabled ? 'ON' : 'OFF'}`);
-			case 11:
-				if (isEditingApiKey && isSelected) {
-					return (
-						<Box key={11} paddingX={1}>
-							<TextInput
-								value={llmApiKey}
-								onChange={setLLMApiKey}
-								onSubmit={value => {
-									const trimmed = value.trim();
-									setLLMApiKey(trimmed);
-									config.setLLMApiKey(trimmed);
-									setIsEditingApiKey(false);
-								}}
-								placeholder="Enter your Gemini API key"
-								focus
-							/>
-						</Box>
-					);
-				}
-				return box(
-					`API Key: ${llmApiKey ? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}` : '(not set)'}`,
-				);
-			case 12:
-				return box(`Model: ${llmModel}`);
-			case 13:
-				return box(`Temperature: ${llmTemperature.toFixed(1)}`);
-			case 14:
-				return box(
-					`Endpoint: ${llmEndpoint ? llmEndpoint.replace('https://', '').substring(0, 30) : 'Default (Gemini)'}`,
-				);
-			case 15:
-				if (isEditingBaseUrl && isSelected) {
-					return (
-						<Box key={15} paddingX={1}>
-							<TextInput
-								value={llmBaseUrl}
-								onChange={setLLMBaseUrl}
-								onSubmit={value => {
-									const trimmed = value.trim();
-									setLLMBaseUrl(trimmed);
-									config.setLLMConfig({
-										...config.getLLMConfig(),
-										baseUrl: trimmed,
-									});
-									setIsEditingBaseUrl(false);
-								}}
-								placeholder="Enter base URL (e.g., https://api.kilogateway.com/v1)"
-								focus
-							/>
-						</Box>
-					);
-				}
-				return box(
-					`Base URL: ${llmBaseUrl ? llmBaseUrl.replace('https://', '').substring(0, 30) : '(not set)'}`,
-				);
-			case 16:
-				return box(`Download Feature: ${downloadsEnabled ? 'ON' : 'OFF'}`);
-			case 17:
-				if (isEditingDownloadDirectory && isSelected) {
-					return (
-						<Box key={17} paddingX={1}>
-							<TextInput
-								value={downloadDirectory}
-								onChange={setDownloadDirectory}
-								onSubmit={value => {
-									const normalized = value.trim();
-									if (!normalized) {
-										setIsEditingDownloadDirectory(false);
-										return;
-									}
-									setDownloadDirectory(normalized);
-									config.set('downloadDirectory', normalized);
-									setIsEditingDownloadDirectory(false);
-								}}
-								placeholder="Download directory"
-								focus
-							/>
-						</Box>
-					);
-				}
-				return box(`Download Folder: ${downloadDirectory}`);
-			case 18:
-				return box(`Download Format: ${downloadFormat.toUpperCase()}`);
-			case 19:
-				return (
-					<Box key={19} paddingX={1}>
-						<Text
-							backgroundColor={bg}
-							color={
-								isSelected
-									? theme.colors.background
-									: isActive
-										? theme.colors.accent
-										: theme.colors.text
-							}
-							bold={isSelected}
-						>
-							{sleepTimerLabel}
-						</Text>
-					</Box>
-				);
-			case 20:
-				return box('Import Playlists →');
-			case 21:
-				return box('Export Playlists →');
-			case 22:
-				return box('Custom Keybindings →');
-			case 23:
-				return box('Manage Plugins');
-			default:
-				return null;
-		}
-	};
-
-	return (
-		<Box flexDirection="column" flexGrow={1} minHeight={0} gap={0}>
-			<Box
-				borderStyle="double"
-				borderColor={theme.colors.secondary}
-				paddingX={1}
-				marginBottom={1}
-			>
-				<Text bold color={theme.colors.primary}>
-					Settings
-				</Text>
-			</Box>
-
-			{canScrollUp && (
-				<Text color={theme.colors.dim}>▲ {scrollOffset} more</Text>
-			)}
-
-			{visibleSettings.map((_item, index) =>
-				renderSettingItem(scrollOffset + index, index === selectedIndex),
-			)}
-
-			{canScrollDown && (
-				<Text color={theme.colors.dim}>
-					▼ {SETTINGS_ITEMS.length - scrollOffset - maxVisible} more
-				</Text>
-D
-			)}
-
 
 			{/* Info */}
 			<Box marginTop={1}>

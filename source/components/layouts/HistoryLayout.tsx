@@ -4,7 +4,7 @@ import {useTheme} from '../../hooks/useTheme.ts';
 import {useHistory} from '../../stores/history.store.tsx';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {truncate} from '../../utils/format.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';

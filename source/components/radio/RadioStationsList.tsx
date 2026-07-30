@@ -3,7 +3,7 @@ import {Box, Text} from 'ink';
 import TextInput from 'ink-text-input';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.ts';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {useKeyboardBlocker} from '../../hooks/useKeyboardBlocker.tsx';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';

@@ -9,7 +9,7 @@ import {
 	useKeyBinding,
 	registerGoHomeCallback,
 	setCurrentViewForCtrlC,
-} from '../../hooks/useKeyboard.ts';
+} from '../../hooks/useKeyboard.tsx';
 import SearchLayout from './SearchLayout.tsx';
 import PlayerLayout from './PlayerLayout.tsx';
 import MiniPlayerLayout from './MiniPlayerLayout.tsx';
