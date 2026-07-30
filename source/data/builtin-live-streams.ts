@@ -23,6 +23,20 @@ export const BUILTIN_LIVE_STREAMS: readonly LiveStreamEntry[] = [
 		description: 'Classic Lofi Girl 24/7 live',
 	},
 	{
+		id: 'bootleg-boy',
+		name: 'STEEZYASFUCK — lofi hip hop radio',
+		url: 'https://www.youtube.com/@STEEZYASFUCK/live',
+		tags: ['lofi', 'chill'],
+		description: '24/7 lofi hip hop beats for coding and relaxation',
+	},
+	{
+		id: 'jazz-hop-cafe',
+		name: 'The Jazz Hop Cafe — lofi jazz',
+		url: 'https://www.youtube.com/@TheJazzHopCafe/live',
+		tags: ['jazz', 'lofi', 'coding'],
+		description: 'Chill lofi jazz hip hop for studying and focus',
+	},
+	{
 		id: 'coding-synth',
 		name: 'Luxnova — Cyber Gothic / Synthwave (24/7)',
 		url: 'https://www.youtube.com/watch?v=Jq4bXit1Ees',
@@ -44,10 +58,31 @@ export const BUILTIN_LIVE_STREAMS: readonly LiveStreamEntry[] = [
 		description: 'SomaFM ambient/downtempo for focus',
 	},
 	{
+		id: 'soma-drone',
+		name: 'SomaFM — Drone Zone',
+		url: 'https://ice1.somafm.com/dronezone-128-mp3',
+		tags: ['ambient', 'focus'],
+		description: 'SomaFM atmospheric ambient drone for deep focus',
+	},
+	{
+		id: 'soma-spacestation',
+		name: 'SomaFM — Space Station',
+		url: 'https://ice1.somafm.com/spacestation-128-mp3',
+		tags: ['ambient', 'electronic'],
+		description: 'SomaFM ambient space music with NASA radio samples',
+	},
+	{
 		id: 'chillhop-live',
 		name: 'Chillhop Music',
 		url: 'https://www.youtube.com/@ChillhopMusic/live',
 		tags: ['lofi', 'chill'],
 		description: 'Chillhop Music live channel',
+	},
+	{
+		id: 'radio-paradise',
+		name: 'Radio Paradise — Main Mix',
+		url: 'http://stream.radioparadise.com/mp3-128',
+		tags: ['eclectic', 'radio'],
+		description: 'Listener-supported eclectic rock, world, electronic and more',
 	},
 ] as const;

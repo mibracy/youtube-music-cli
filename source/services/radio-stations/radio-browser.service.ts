@@ -7,7 +7,7 @@ import {
 } from './radio-browser-cache.ts';
 
 const USER_AGENT = 'youtube-music-cli/radio-browser';
-const DEFAULT_BROWSE_LIMIT = 50;
+const DEFAULT_BROWSE_LIMIT = 10_000;
 const DEFAULT_SEARCH_LIMIT = 40;
 const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -173,7 +173,6 @@ export async function browseStations(options?: {
 		order: 'votes',
 		reverse: true,
 		hidebroken: true,
-		limit,
 	};
 	if (countrycode !== 'ALL') {
 		params.countrycode = countrycode;

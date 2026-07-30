@@ -3,7 +3,6 @@ import type {RadioStation} from '../../types/radio-station.types.ts';
 import {RADIO_COUNTRY_OPTIONS} from '../../types/radio-station.types.ts';
 import {
 	flattenRadioStations,
-	getBuiltinStations,
 	loadBrowseStations,
 	loadRandomStation,
 	loadSearchStations,
@@ -25,7 +24,6 @@ export interface RadioOverlayState {
 	status: string | null;
 	searchQuery: string;
 	favorites: readonly RadioStation[];
-	builtins: readonly RadioStation[];
 	remote: RadioStation[];
 	countryIndex: number;
 	loading: boolean;
@@ -50,7 +48,6 @@ export function createRadioOverlayState(): RadioOverlayState {
 		status: null,
 		searchQuery: '',
 		favorites: getRadioFavorites(),
-		builtins: getBuiltinStations(),
 		remote: [],
 		countryIndex: 0,
 		loading: false,
@@ -62,7 +59,6 @@ export function getRadioOverlayStations(
 ): RadioStation[] {
 	return flattenRadioStations({
 		favorites: state.favorites,
-		builtins: state.builtins,
 		remote: state.remote,
 	});
 }
@@ -80,14 +76,7 @@ function buildDisplayRows(state: RadioOverlayState): DisplayRow[] {
 		}
 	}
 
-	const local = state.builtins.filter(station => !favoriteIds.has(station.id));
-	if (local.length > 0) {
-		rows.push({kind: 'header', label: 'Local'});
-		for (const station of local) {
-			rows.push({kind: 'station', station, flatIndex});
-			flatIndex += 1;
-		}
-	}
+	rows.push({kind: 'header', label: currentCountry(state).label});
 
 	const country = currentCountry(state);
 	const remoteLabel =
@@ -123,7 +112,6 @@ export function openRadioOverlay(state: RadioOverlayState): void {
 	state.selectedIndex = 0;
 	state.searchQuery = '';
 	state.favorites = getRadioFavorites();
-	state.builtins = getBuiltinStations();
 	state.remote = [];
 	state.loading = true;
 	const country = currentCountry(state);
@@ -146,7 +134,6 @@ export function applyRadioStationList(
 	status: string,
 ): void {
 	state.favorites = list.favorites;
-	state.builtins = list.builtins;
 	state.remote = list.remote;
 	state.loading = false;
 	state.status = status;

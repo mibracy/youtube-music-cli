@@ -1,4 +1,3 @@
-import {BUILTIN_RADIO_STATIONS} from '../../data/builtin-radio-stations.ts';
 import type {RadioStation} from '../../types/radio-station.types.ts';
 import {getConfigService} from '../config/config.service.ts';
 import {getPlayerService} from '../player/player.service.ts';
@@ -13,25 +12,16 @@ import {getRadioFavorites} from './radio-favorites.service.ts';
 
 export type RadioStationList = {
 	favorites: readonly RadioStation[];
-	builtins: readonly RadioStation[];
 	remote: RadioStation[];
 	fromCache?: boolean;
 	stale?: boolean;
 };
 
-export function getBuiltinStations(): readonly RadioStation[] {
-	return BUILTIN_RADIO_STATIONS;
-}
-
-export function getStationById(id: string): RadioStation | undefined {
-	return BUILTIN_RADIO_STATIONS.find(station => station.id === id);
-}
-
 export function flattenRadioStations(list: RadioStationList): RadioStation[] {
 	const seen = new Set<string>();
 	const flat: RadioStation[] = [];
 
-	for (const station of [...list.favorites, ...list.builtins, ...list.remote]) {
+	for (const station of [...list.favorites, ...list.remote]) {
 		if (seen.has(station.id)) {
 			continue;
 		}
@@ -48,7 +38,6 @@ function withFavorites(
 ): RadioStationList {
 	return {
 		favorites: getRadioFavorites(),
-		builtins: getBuiltinStations(),
 		remote,
 		fromCache: meta?.fromCache,
 		stale: meta?.stale,

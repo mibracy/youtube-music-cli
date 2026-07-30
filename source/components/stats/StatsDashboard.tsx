@@ -1,3 +1,4 @@
+import {useState, useCallback} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useStats} from '../../stores/stats.store.tsx';
@@ -8,15 +9,57 @@ import StatsOverview from './StatsOverview.tsx';
 import TopTracksList from './TopTracksList.tsx';
 import TopArtistsList from './TopArtistsList.tsx';
 import ListeningTimeline from './ListeningTimeline.tsx';
+import {
+	formatStatsShareCard,
+	copyTextToClipboard,
+	writeStatsShareFile,
+} from '../../services/stats/stats-share.ts';
 
 export default function StatsDashboard() {
 	const {theme} = useTheme();
 	const {stats} = useStats();
 	const {dispatch} = useNavigation();
+	const [status, setStatus] = useState<string | null>(null);
+	const [statusColor, setStatusColor] = useState<string>(theme.colors.success);
+
+	const shareToClipboard = useCallback(async () => {
+		setStatus('Copying stats to clipboard…');
+		setStatusColor(theme.colors.dim);
+		const card = formatStatsShareCard(stats);
+		const ok = await copyTextToClipboard(card);
+		if (ok) {
+			setStatus('Share card copied to clipboard');
+			setStatusColor(theme.colors.success);
+		} else {
+			setStatus('Failed to copy — no clipboard tool found');
+			setStatusColor(theme.colors.error);
+		}
+	}, [stats, theme]);
+
+	const exportToFile = useCallback(async () => {
+		setStatus('Writing stats file…');
+		setStatusColor(theme.colors.dim);
+		const card = formatStatsShareCard(stats);
+		try {
+			const filePath = await writeStatsShareFile(card);
+			setStatus(`Stats saved to ${filePath}`);
+			setStatusColor(theme.colors.success);
+		} catch (error) {
+			setStatus(
+				error instanceof Error ? error.message : 'Failed to write stats file',
+			);
+			setStatusColor(theme.colors.error);
+		}
+	}, [stats, theme]);
 
 	useKeyBinding(KEYBINDINGS.BACK, () => {
 		dispatch({category: 'GO_BACK'});
 	});
+	useKeyBinding(['o'], () => {
+		dispatch({category: 'NAVIGATE', view: 'stats'});
+	});
+	useKeyBinding(['s'], shareToClipboard);
+	useKeyBinding(['e'], exportToFile);
 
 	return (
 		<Box flexDirection="column" flexGrow={1} minHeight={0} padding={1} gap={1}>
@@ -62,8 +105,16 @@ export default function StatsDashboard() {
 			<TopArtistsList artists={stats.topArtists} />
 			<ListeningTimeline buckets={stats.listeningByDay} />
 
-			<Box marginTop={1}>
-				<Text color={theme.colors.dim}>Esc to go back • O to reopen stats</Text>
+			<Box marginTop={1} flexDirection="column">
+				{status && (
+					<Box marginBottom={1}>
+						<Text color={statusColor}>{status}</Text>
+					</Box>
+				)}
+				<Text color={theme.colors.dim}>
+					Esc to go back • O to reopen stats • S share (clipboard) • E export
+					file
+				</Text>
 			</Box>
 		</Box>
 	);

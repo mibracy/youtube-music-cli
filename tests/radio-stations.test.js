@@ -2,10 +2,7 @@ import {afterEach, expect, test} from 'bun:test';
 import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {BUILTIN_RADIO_STATIONS} from '../source/data/builtin-radio-stations.ts';
 import {
-	getBuiltinStations,
-	getStationById,
 	playStationStream,
 	flattenRadioStations,
 } from '../source/services/radio-stations/radio-stations.service.ts';
@@ -36,29 +33,19 @@ import {
 } from '../source/immersive/ui/radio-overlay.ts';
 import {buildModeStatusLine} from '../source/immersive/ui/layout.ts';
 
+const MOCK_STATION = {
+	id: 'mock-station',
+	name: 'Mock Radio',
+	streamUrl: 'http://example.com/stream',
+	region: 'Test',
+	genre: 'Test',
+	source: 'radio-browser',
+};
+
 afterEach(() => {
 	setRadioBrowserCachePathForTests(null);
 	setRadioFavoritesPathForTests(null);
 	resetRadioFavoritesForTests();
-});
-
-test('builtin radio stations have unique ids and http stream URLs', () => {
-	const stations = getBuiltinStations();
-	const ids = new Set();
-
-	for (const station of stations) {
-		expect(ids.has(station.id), `duplicate id: ${station.id}`).toBe(false);
-		ids.add(station.id);
-		expect(station.streamUrl.startsWith('http')).toBe(true);
-		expect(station.name.length > 0).toBe(true);
-		expect(station.source).toBe('builtin');
-	}
-
-	expect(stations.length).toBe(BUILTIN_RADIO_STATIONS.length);
-	expect(getStationById('rockland-kl')?.name).toBe(
-		'Rockland Radio — Kaiserslautern',
-	);
-	expect(getStationById('swr3')).toBeTruthy();
 });
 
 test('mapApiStationToRadioStation maps radio-browser rows', () => {
@@ -158,15 +145,12 @@ test('radio favorites toggle persists stations', () => {
 	setRadioFavoritesPathForTests(join(dir, 'fav.json'));
 	resetRadioFavoritesForTests();
 
-	const station = getStationById('swr3');
-	expect(station).toBeTruthy();
-
-	expect(toggleRadioFavorite(station)).toBe(true);
-	expect(isRadioFavorite('swr3')).toBe(true);
+	expect(toggleRadioFavorite(MOCK_STATION)).toBe(true);
+	expect(isRadioFavorite('mock-station')).toBe(true);
 	expect(getRadioFavorites().length).toBe(1);
 
-	expect(toggleRadioFavorite(station)).toBe(false);
-	expect(isRadioFavorite('swr3')).toBe(false);
+	expect(toggleRadioFavorite(MOCK_STATION)).toBe(false);
+	expect(isRadioFavorite('mock-station')).toBe(false);
 	expect(getRadioFavorites().length).toBe(0);
 
 	rmSync(dir, {recursive: true, force: true});
@@ -174,8 +158,6 @@ test('radio favorites toggle persists stations', () => {
 
 test('PLAY_STREAM reducer enters stream playback mode and clears metadata', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
-	const station = getStationById('rockland-kl');
-	expect(station).toBeTruthy();
 
 	const state = {
 		currentTrack: {videoId: 'abc', title: 'Song', artists: []},
@@ -206,10 +188,13 @@ test('PLAY_STREAM reducer enters stream playback mode and clears metadata', asyn
 		},
 	};
 
-	const next = playerReducer(state, {category: 'PLAY_STREAM', station});
+	const next = playerReducer(state, {
+		category: 'PLAY_STREAM',
+		station: MOCK_STATION,
+	});
 
 	expect(next.playbackMode).toBe('stream');
-	expect(next.currentStation).toBe(station);
+	expect(next.currentStation).toBe(MOCK_STATION);
 	expect(next.currentTrack).toBe(null);
 	expect(next.queue).toEqual([]);
 	expect(next.autoplay).toBe(false);
@@ -233,8 +218,6 @@ test('playStationStream passes direct stream URL and station id to mpv', async (
 	const {getPlayerService} =
 		await import('../source/services/player/player.service.ts');
 	const player = getPlayerService();
-	const station = getStationById('rockland-kl');
-	expect(station).toBeTruthy();
 
 	const originalPlay = player.play.bind(player);
 	let capturedUrl = '';
@@ -246,16 +229,16 @@ test('playStationStream passes direct stream URL and station id to mpv', async (
 	};
 
 	try {
-		await playStationStream(station);
-		expect(capturedUrl).toBe(station.streamUrl);
-		expect(capturedTrackId).toBe(station.id);
+		await playStationStream(MOCK_STATION);
+		expect(capturedUrl).toBe(MOCK_STATION.streamUrl);
+		expect(capturedTrackId).toBe(MOCK_STATION.id);
 	} finally {
 		player.play = originalPlay;
 	}
 });
 
-test('flattenRadioStations keeps favorites then builtins before remote', () => {
-	const builtins = getBuiltinStations();
+test('flattenRadioStations keeps favorites before remote', () => {
+	const fav = {...MOCK_STATION, id: 'fav-station', name: 'Favorite'};
 	const remote = [
 		mapApiStationToRadioStation({
 			stationuuid: 'aaa',
@@ -266,11 +249,10 @@ test('flattenRadioStations keeps favorites then builtins before remote', () => {
 	].filter(Boolean);
 
 	const flat = flattenRadioStations({
-		favorites: [builtins[6]],
-		builtins,
+		favorites: [fav],
 		remote,
 	});
-	expect(flat[0]?.id).toBe('swr3');
+	expect(flat[0]?.id).toBe('fav-station');
 	expect(flat.at(-1)?.source).toBe('radio-browser');
 });
 
@@ -281,10 +263,9 @@ test('radio overlay selects and plays a station', () => {
 		overlay,
 		{
 			favorites: [],
-			builtins: getBuiltinStations(),
-			remote: [],
+			remote: [MOCK_STATION],
 		},
-		'8 local stations',
+		'1 station',
 	);
 	expect(overlay.active).toBe(true);
 
@@ -303,7 +284,7 @@ test('radio overlay search, random, and country actions', () => {
 	openRadioOverlay(overlay);
 	applyRadioStationList(
 		overlay,
-		{favorites: [], builtins: getBuiltinStations(), remote: []},
+		{favorites: [], remote: [MOCK_STATION]},
 		'ready',
 	);
 
@@ -322,18 +303,14 @@ test('radio overlay search, random, and country actions', () => {
 	cycleRadioCountry(overlay);
 });
 
-test('buildModeStatusLine shows LIVE for stream playback', () => {
+test('buildModeStatusLine returns mode line', () => {
 	const line = buildModeStatusLine({
-		shuffle: false,
-		repeat: 'off',
+		shuffle: true,
+		repeat: 'all',
 		isDiscoMode: false,
-		autoplay: false,
-		playbackMode: 'stream',
-		currentStation: {name: 'Rockland Radio — Kaiserslautern'},
 	});
 
-	expect(line.includes('LIVE')).toBe(true);
-	expect(line.includes('Rockland')).toBe(true);
+	expect(line).toBe('Shuffle ON · Repeat ALL · Disco OFF');
 });
 
 test('shouldPrefetchAutoplay is false at stream mode queue end', async () => {

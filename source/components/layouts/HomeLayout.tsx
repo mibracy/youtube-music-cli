@@ -103,11 +103,15 @@ export default function HomeLayout() {
 
 	// Calculate how many items fit per section based on terminal height
 	const headerRows = 3;
-	const progressRows = playerState.currentTrack ? 4 : 0;
+	const progressRows =
+		playerState.currentTrack || playerState.playbackMode === 'stream' ? 4 : 0;
 	const footerRows = rows >= 25 ? 3 : 1;
 	const sectionBorderTitleRows = 3;
 
-	const shouldHideMenus = rows < 35 && playerState.currentTrack !== null;
+	const shouldHideMenus =
+		rows < 35 &&
+		(playerState.currentTrack !== null ||
+			playerState.playbackMode === 'stream');
 
 	const availableForRightColumn = rows - headerRows - progressRows - footerRows;
 	const itemsPerSection = Math.max(
@@ -435,6 +439,45 @@ export default function HomeLayout() {
 					</Box>
 				</Box>
 			)}
+			{playerState.playbackMode === 'stream' &&
+				playerState.currentStation &&
+				!playerState.currentTrack && (
+					<Box
+						flexDirection="column"
+						borderStyle="round"
+						borderColor={theme.colors.secondary}
+						paddingX={1}
+						marginY={0}
+					>
+						<Box justifyContent="space-between">
+							<Box>
+								<Text color={theme.colors.accent} bold>
+									📻 {playerState.currentStation.name}
+								</Text>
+								<Text color={theme.colors.success}> LIVE</Text>
+							</Box>
+							{playerState.currentStation.region && (
+								<Text color={theme.colors.dim}>
+									{playerState.currentStation.region}
+								</Text>
+							)}
+						</Box>
+						{playerState.streamNowPlaying && (
+							<Box>
+								<Text color={theme.colors.secondary}>Now: </Text>
+								<Text color={theme.colors.text}>
+									{playerState.streamNowPlaying.artist &&
+									playerState.streamNowPlaying.title
+										? `${playerState.streamNowPlaying.artist} — ${playerState.streamNowPlaying.title}`
+										: (playerState.streamNowPlaying.raw ?? '')}
+								</Text>
+							</Box>
+						)}
+						{playerState.isLoading && (
+							<Text color={theme.colors.dim}>Loading stream...</Text>
+						)}
+					</Box>
+				)}
 
 			{shouldHideMenus && (
 				// Empty box below to help center the player vertically when menus are hidden
@@ -470,7 +513,7 @@ export default function HomeLayout() {
 				{rows >= 25 && columns >= 130 && (
 					<Box>
 						<Text color={theme.colors.dim}>
-							Favorites: f • History: Sft+H • Settings: ,
+							Favorites: f • History: Sft+H • Stats: o • Settings: ,
 						</Text>
 					</Box>
 				)}

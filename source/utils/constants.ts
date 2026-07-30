@@ -86,7 +86,7 @@ export const SEARCH_TYPE = {
 // Keybindings
 export const KEYBINDINGS = {
 	// Global
-	QUIT: [],
+	QUIT: ['q'],
 	HELP: ['?'],
 	SEARCH: ['/'],
 	PLAYLISTS: ['shift+p'],
@@ -113,6 +113,7 @@ export const KEYBINDINGS = {
 	NEXT: ['n'],
 	PREVIOUS: ['b'],
 	ADD_TO_QUEUE: ['q'],
+	PLAY_NEXT: ['y'],
 	VOLUME_UP: ['=', '+'], // '=' (no shift) or '+' (shift+=) both trigger volume up
 	VOLUME_DOWN: ['-'], // '-' triggers volume down
 	VOLUME_FINE_UP: ['ctrl+='], // Fine-grained +1 step (Ctrl+= to avoid conflict with '+')

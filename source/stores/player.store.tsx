@@ -66,6 +66,9 @@ export function playerReducer(
 				duration: 0,
 				error: null,
 				playRequestId: state.playRequestId + 1,
+				playbackMode: 'youtube',
+				currentStation: null,
+				streamNowPlaying: null,
 			};
 
 		case 'PAUSE': {
@@ -368,6 +371,12 @@ export function playerReducer(
 				autoplay: action.autoplay ?? true,
 				isPlaying: false, // Don't auto-play restored state
 				abLoop: {a: null, b: null},
+			};
+
+		case 'SET_STREAM_NOW_PLAYING':
+			return {
+				...state,
+				streamNowPlaying: action.streamNowPlaying,
 			};
 
 		default:
@@ -690,6 +699,57 @@ function PlayerManager() {
 		state.playRequestId,
 		dispatch,
 		musicService,
+	]);
+
+	// Handle stream playback (internet radio / live streams)
+	const lastStreamStationRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (
+			state.playbackMode !== 'stream' ||
+			!state.currentStation ||
+			!state.isPlaying
+		) {
+			return;
+		}
+
+		if (lastStreamStationRef.current === state.currentStation.id) {
+			return;
+		}
+
+		lastStreamStationRef.current = state.currentStation.id;
+
+		const config = getConfigService();
+		const streamUrl = state.currentStation.streamUrl;
+
+		logger.info('PlayerManager', 'Playing stream', {
+			name: state.currentStation.name,
+			url: streamUrl,
+		});
+
+		playerService
+			.play(streamUrl, {
+				volume: state.volume,
+				proxy: config.get('proxy'),
+				trackId: state.currentStation.id,
+			})
+			.catch((error: unknown) => {
+				logger.error('PlayerManager', 'Failed to play stream', {
+					error: error instanceof Error ? error.message : String(error),
+					station: state.currentStation?.name,
+				});
+				dispatch({
+					category: 'SET_ERROR',
+					error:
+						error instanceof Error ? error.message : 'Failed to play stream',
+				});
+			});
+	}, [
+		state.playbackMode,
+		state.currentStation,
+		state.isPlaying,
+		state.volume,
+		dispatch,
+		playerService,
 	]);
 
 	// Handle progress tracking

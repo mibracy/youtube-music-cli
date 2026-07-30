@@ -185,7 +185,10 @@ function MainLayout() {
 
 	// Global keyboard bindings
 	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, handleAddToQueue);
-	useKeyBinding(KEYBINDINGS.SEARCH, goToSearch);
+	useKeyBinding(
+		navState.currentView === VIEW.RADIO ? [] : KEYBINDINGS.SEARCH,
+		goToSearch,
+	);
 	useKeyBinding(KEYBINDINGS.PLAYLISTS, goToPlaylists);
 	useKeyBinding(KEYBINDINGS.PLUGINS, goToPlugins);
 	useKeyBinding(KEYBINDINGS.SUGGESTIONS, goToSuggestions);

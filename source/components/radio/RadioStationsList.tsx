@@ -13,10 +13,8 @@ import type {RadioStation} from '../../types/radio-station.types.ts';
 import {RADIO_COUNTRY_OPTIONS} from '../../types/radio-station.types.ts';
 import {
 	flattenRadioStations,
-	getBuiltinStations,
 	loadBrowseStations,
 	loadRandomStation,
-	loadSearchStations,
 } from '../../services/radio-stations/radio-stations.service.ts';
 import {
 	getRadioFavorites,
@@ -32,7 +30,6 @@ type ListRow =
 
 function buildRows(
 	favorites: readonly RadioStation[],
-	builtins: readonly RadioStation[],
 	remote: RadioStation[],
 	remoteLabel: string,
 ): ListRow[] {
@@ -43,16 +40,6 @@ function buildRows(
 		rows.push({kind: 'header', id: 'hdr-fav', label: 'Favorites'});
 		for (const station of favorites) {
 			rows.push({kind: 'station', id: `fav-${station.id}`, station});
-		}
-	}
-
-	const localStations = builtins.filter(
-		station => !favoriteIds.has(station.id),
-	);
-	if (localStations.length > 0) {
-		rows.push({kind: 'header', id: 'hdr-local', label: 'Local'});
-		for (const station of localStations) {
-			rows.push({kind: 'station', id: station.id, station});
 		}
 	}
 
@@ -87,12 +74,20 @@ function friendlyNetworkError(error: unknown): string {
 	return message;
 }
 
+function matchesQuery(station: RadioStation, query: string): boolean {
+	const q = query.toLowerCase();
+	return (
+		station.name.toLowerCase().includes(q) ||
+		(station.region?.toLowerCase().includes(q) ?? false) ||
+		(station.genre?.toLowerCase().includes(q) ?? false)
+	);
+}
+
 export default function RadioStationsList() {
 	const {theme} = useTheme();
 	const {playStream, state: playerState} = usePlayer();
 	const {dispatch} = useNavigation();
 	const {columns, rows: termRows} = useTerminalSize();
-	const builtins = getBuiltinStations();
 
 	const [favorites, setFavorites] = useState<readonly RadioStation[]>(() =>
 		getRadioFavorites(),
@@ -114,17 +109,26 @@ export default function RadioStationsList() {
 
 	const remoteLabel =
 		mode === 'search' && searchQuery.trim()
-			? `Search: ${searchQuery.trim()}`
+			? `Filter: ${searchQuery.trim()}`
 			: `Browse · ${country.label}`;
 
+	const filteredRemote = useMemo(() => {
+		if (!searchQuery.trim()) {
+			return remote;
+		}
+
+		const q = searchQuery.trim().toLowerCase();
+		return remote.filter(s => matchesQuery(s, q));
+	}, [remote, searchQuery]);
+
 	const listRows = useMemo(
-		() => buildRows(favorites, builtins, remote, remoteLabel),
-		[favorites, builtins, remote, remoteLabel],
+		() => buildRows(favorites, filteredRemote, remoteLabel),
+		[favorites, filteredRemote, remoteLabel],
 	);
 
 	const stations = useMemo(
-		() => flattenRadioStations({favorites, builtins, remote}),
-		[favorites, builtins, remote],
+		() => flattenRadioStations({favorites, remote: filteredRemote}),
+		[favorites, filteredRemote],
 	);
 
 	const selectableIndexes = useMemo(
@@ -135,32 +139,6 @@ export default function RadioStationsList() {
 		[listRows],
 	);
 
-	const loadBrowse = useCallback(async (countrycode: string) => {
-		setLoading(true);
-		setError(null);
-		try {
-			const list = await loadBrowseStations({countrycode, limit: 50});
-			setRemote(list.remote);
-			setMode('browse');
-			setFavorites(getRadioFavorites());
-			const cacheNote = list.fromCache
-				? list.stale
-					? ' · cached (offline)'
-					: ' · cached'
-				: '';
-			setStatus(
-				`${list.remote.length} ${countryLabel(countrycode)} stations${cacheNote}`,
-			);
-			return true;
-		} catch (loadError) {
-			setRemote([]);
-			setError(friendlyNetworkError(loadError));
-			return false;
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
 	useEffect(() => {
 		let cancelled = false;
 
@@ -170,7 +148,6 @@ export default function RadioStationsList() {
 			try {
 				const list = await loadBrowseStations({
 					countrycode: country.code,
-					limit: 50,
 				});
 				if (cancelled) {
 					return;
@@ -258,43 +235,34 @@ export default function RadioStationsList() {
 
 		if (mode === 'search') {
 			setSearchQuery('');
-			void loadBrowse(country.code);
+			setMode('browse');
+			setStatus(null);
+			setSelectedIndex(0);
 			return;
 		}
 
 		dispatch({category: 'GO_BACK'});
-	}, [dispatch, isSearching, mode, loadBrowse, country.code]);
+	}, [dispatch, isSearching, mode]);
 
 	const startSearch = useCallback(() => {
 		setIsSearching(true);
 		setSearchQuery('');
 		setError(null);
-		setStatus('Type a station name, then Enter');
+		setStatus('Type to filter stations by name, region or genre');
 	}, []);
 
-	const submitSearch = useCallback(async () => {
+	const submitSearch = useCallback(() => {
 		const query = searchQuery.trim();
 		setIsSearching(false);
 		if (!query) {
 			return;
 		}
 
-		setLoading(true);
-		setError(null);
-		setStatus(`Searching “${query}”…`);
-		try {
-			const list = await loadSearchStations(query);
-			setRemote(list.remote);
-			setMode('search');
-			setFavorites(getRadioFavorites());
-			setStatus(`${list.remote.length} results for “${query}”`);
-			setSelectedIndex(0);
-		} catch (searchError) {
-			setError(friendlyNetworkError(searchError));
-		} finally {
-			setLoading(false);
-		}
-	}, [searchQuery]);
+		const count = remote.filter(s => matchesQuery(s, query)).length;
+		setMode('search');
+		setStatus(`${count} results for "${query}"`);
+		setSelectedIndex(0);
+	}, [searchQuery, remote]);
 
 	const playRandom = useCallback(async () => {
 		setStatus('Picking random station…');
@@ -349,7 +317,7 @@ export default function RadioStationsList() {
 	useKeyBinding(['c'], cycleCountry);
 	useKeyBinding(['f'], toggleFavoriteSelected);
 
-	const ITEMS_PER_PAGE = Math.max(5, termRows - 16);
+	const ITEMS_PER_PAGE = Math.max(5, Math.min(35, termRows - 20));
 	const startIdx = Math.max(
 		0,
 		Math.min(
@@ -419,6 +387,8 @@ export default function RadioStationsList() {
 				</Box>
 			) : null}
 
+			{startIdx > 0 && <Text color={theme.colors.dim}>▲ {startIdx} more</Text>}
+
 			{visibleItems.map((row, idx) => {
 				const realIndex = startIdx + idx;
 				if (row.kind === 'header') {
@@ -462,6 +432,10 @@ export default function RadioStationsList() {
 					</Box>
 				);
 			})}
+
+			{endIdx < listRows.length && (
+				<Text color={theme.colors.dim}>▼ {listRows.length - endIdx} more</Text>
+			)}
 
 			{!loading && remote.length === 0 && mode === 'browse' && !error ? (
 				<Box marginTop={1}>

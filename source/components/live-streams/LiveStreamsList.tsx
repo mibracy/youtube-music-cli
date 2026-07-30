@@ -45,7 +45,7 @@ export default function LiveStreamsList() {
 	useKeyBinding(KEYBINDINGS.SELECT, playSelected);
 	useKeyBinding(KEYBINDINGS.BACK, goBack);
 
-	const maxVisible = Math.max(5, termRows - 14);
+	const maxVisible = Math.max(5, Math.min(35, termRows - 20));
 	const start = Math.max(
 		0,
 		Math.min(
@@ -68,34 +68,44 @@ export default function LiveStreamsList() {
 			{streams.length === 0 ? (
 				<Text color={theme.colors.dim}>No live streams in catalog</Text>
 			) : (
-				visible.map((entry, offset) => {
-					const index = start + offset;
-					const isSelected = index === selectedIndex;
-					const isPlaying =
-						playerState.playbackMode === 'stream' &&
-						playerState.currentStation?.id === entry.id;
-					const tags = entry.tags.join(', ');
-					const prefix = isPlaying ? '▶ ' : isSelected ? '> ' : '  ';
+				<>
+					{start > 0 && <Text color={theme.colors.dim}>▲ {start} more</Text>}
 
-					return (
-						<Box key={entry.id}>
-							<Text
-								bold={isSelected}
-								color={
-									isPlaying
-										? theme.colors.success
-										: isSelected
-											? theme.colors.primary
-											: theme.colors.text
-								}
-							>
-								{prefix}
-								{truncate(entry.name, nameWidth)}
-							</Text>
-							<Text color={theme.colors.dim}> · {tags}</Text>
-						</Box>
-					);
-				})
+					{visible.map((entry, offset) => {
+						const index = start + offset;
+						const isSelected = index === selectedIndex;
+						const isPlaying =
+							playerState.playbackMode === 'stream' &&
+							playerState.currentStation?.id === entry.id;
+						const tags = entry.tags.join(', ');
+						const prefix = isPlaying ? '▶ ' : isSelected ? '> ' : '  ';
+
+						return (
+							<Box key={entry.id}>
+								<Text
+									bold={isSelected}
+									color={
+										isPlaying
+											? theme.colors.success
+											: isSelected
+												? theme.colors.primary
+												: theme.colors.text
+									}
+								>
+									{prefix}
+									{truncate(entry.name, nameWidth)}
+								</Text>
+								<Text color={theme.colors.dim}> · {tags}</Text>
+							</Box>
+						);
+					})}
+
+					{start + maxVisible < streams.length && (
+						<Text color={theme.colors.dim}>
+							▼ {streams.length - start - maxVisible} more
+						</Text>
+					)}
+				</>
 			)}
 
 			<Box marginTop={1}>
