@@ -16,7 +16,6 @@ import {logger} from '../../services/logger/logger.service.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {getMusicService} from '../../services/youtube-music/api.ts';
 import {getDownloadService} from '../../services/download/download.service.ts';
-import {formatDownloadProgress} from '../../utils/download-progress.ts';
 
 // Generate unique component instance ID
 let instanceCounter = 0;
@@ -38,9 +37,9 @@ function SearchResults({
 }: Props) {
 	const {theme} = useTheme();
 	const {dispatch} = useNavigation();
-	const {play, dispatch: playerDispatch, addToQueue, playNext} = usePlayer();
+	const {play, dispatch: playerDispatch} = usePlayer();
 	const {isFavorite, toggleFavorite} = useFavorites();
-	const {columns, rows} = useTerminalSize();
+	const {columns} = useTerminalSize();
 	const musicService = getMusicService();
 	const downloadService = getDownloadService();
 	const {createPlaylist} = usePlaylist();
@@ -369,13 +368,9 @@ function SearchResults({
 			}
 
 			downloadStatusRef.current?.(
-				`Downloading ${target.tracks.length} track(s) from "${target.name}"...`,
+				`Downloading ${target.tracks.length} track(s) from "${target.name}"... this can take a few minutes.`,
 			);
-			const summary = await downloadService.downloadTracks(target.tracks, {
-				onProgress: info => {
-					downloadStatusRef.current?.(formatDownloadProgress(info));
-				},
-			});
+			const summary = await downloadService.downloadTracks(target.tracks);
 			downloadStatusRef.current?.(
 				`Downloaded ${summary.downloaded}, skipped ${summary.skipped}, failed ${summary.failed}.`,
 			);
@@ -388,27 +383,9 @@ function SearchResults({
 		}
 	}, [downloadService, isActive, isDownloading, results, selectedIndex]);
 
-	const enqueueSelected = useCallback(() => {
-		if (!isActive) return;
-		const selected = results[selectedIndex];
-		if (selected?.type === 'song') {
-			addToQueue(selected.data as Track);
-		}
-	}, [isActive, results, selectedIndex, addToQueue]);
-
-	const playNextSelected = useCallback(() => {
-		if (!isActive) return;
-		const selected = results[selectedIndex];
-		if (selected?.type === 'song') {
-			playNext(selected.data as Track);
-		}
-	}, [isActive, results, selectedIndex, playNext]);
-
 	useKeyBinding(KEYBINDINGS.UP, navigateUp);
 	useKeyBinding(KEYBINDINGS.DOWN, navigateDown);
 	useKeyBinding(KEYBINDINGS.SELECT, handleSelect);
-	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, enqueueSelected);
-	useKeyBinding(KEYBINDINGS.PLAY_NEXT, playNextSelected);
 	useKeyBinding(KEYBINDINGS.CREATE_MIX, () => {
 		void createMixPlaylist();
 	});
@@ -432,15 +409,6 @@ function SearchResults({
 	}
 
 	// Calculate responsive truncation
-	const maxVisible = Math.max(5, rows - 18);
-	const start = Math.max(
-		0,
-		Math.min(
-			selectedIndex - Math.floor(maxVisible / 2),
-			Math.max(0, results.length - maxVisible),
-		),
-	);
-	const visibleResults = results.slice(start, start + maxVisible);
 	const maxTitleWidth = Math.max(20, Math.floor(columns * 0.35));
 
 	// Extract track info helper
@@ -457,8 +425,7 @@ function SearchResults({
 	return (
 		<Box flexDirection="column">
 			{/* Results list */}
-			{visibleResults.map((result, offset) => {
-				const index = start + offset;
+			{results.map((result, index) => {
 				const isSelected = index === selectedIndex;
 				const data = result.data;
 

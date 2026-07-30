@@ -37,49 +37,6 @@ export default function NowPlaying() {
 		};
 	}, [sleepTimer]);
 
-	if (playerState.playbackMode === 'stream' && playerState.currentStation) {
-		const station = playerState.currentStation;
-		const nowPlaying = playerState.streamNowPlaying;
-		const songLine = nowPlaying
-			? nowPlaying.artist && nowPlaying.title
-				? `${nowPlaying.artist} — ${nowPlaying.title}`
-				: (nowPlaying.title ?? nowPlaying.raw)
-			: null;
-
-		return (
-			<Box
-				flexDirection="column"
-				borderStyle="round"
-				borderColor={theme.colors.primary}
-				paddingX={1}
-			>
-				<Box>
-					<Text bold color={theme.colors.primary}>
-						{station.name}
-					</Text>
-					<Text color={theme.colors.dim}> • </Text>
-					<Text color={theme.colors.accent}>LIVE</Text>
-				</Box>
-				{songLine ? (
-					<Text color={theme.colors.secondary}>{songLine}</Text>
-				) : station.region ? (
-					<Text color={theme.colors.dim}>{station.region}</Text>
-				) : null}
-				{songLine && station.region ? (
-					<Text color={theme.colors.dim}>{station.region}</Text>
-				) : null}
-				<Box>
-					<Text color={theme.colors.secondary}>
-						{playerState.isPlaying ? '▶ Playing' : '⏸ Paused'}
-					</Text>
-					{playerState.isLoading ? (
-						<Text color={theme.colors.dim}> • Loading…</Text>
-					) : null}
-				</Box>
-			</Box>
-		);
-	}
-
 	if (!playerState.currentTrack) {
 		return (
 			<Box borderStyle="round" borderColor={theme.colors.dim} paddingX={1}>
@@ -119,12 +76,6 @@ export default function NowPlaying() {
 				</Text>
 				<Text color={theme.colors.dim}> • </Text>
 				<Text color={theme.colors.secondary}>{artists}</Text>
-				{playerState.mediaSource === 'local' ? (
-					<>
-						<Text color={theme.colors.dim}> • </Text>
-						<Text color={theme.colors.accent}>Local</Text>
-					</>
-				) : null}
 			</Box>
 
 			{/* Album */}

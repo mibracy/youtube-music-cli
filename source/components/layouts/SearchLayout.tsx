@@ -8,6 +8,7 @@ import type {
 	SearchResult,
 	SearchDurationFilter,
 } from '../../types/youtube-music.types.ts';
+import type {NavigationState} from '../../types/navigation.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import SearchBar from '../search/SearchBar.tsx';
 import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
@@ -17,6 +18,7 @@ import {usePlayer} from '../../hooks/usePlayer.ts';
 import {ICONS} from '../../utils/icons.ts';
 import TextInput from 'ink-text-input';
 import {applySearchFilters} from '../../utils/search-filters.ts';
+import {parseVideoId} from '../../services/youtube-music/api.ts';
 
 type FilterField = 'artist' | 'album' | 'year';
 
@@ -36,8 +38,8 @@ const DURATION_ORDER: SearchDurationFilter[] = [
 function SearchLayout() {
 	const {theme} = useTheme();
 	const {state: navState, dispatch} = useNavigation();
-	const {state: playerState} = usePlayer();
-	const {isLoading, error, search} = useYouTubeMusic();
+	const {state: playerState, play} = usePlayer();
+	const {isLoading, error, search, getTrack} = useYouTubeMusic();
 	const [rawResults, setRawResults] = useState<SearchResult[]>([]);
 	const filteredResults = useMemo(
 		() => applySearchFilters(rawResults, navState.searchFilters),
@@ -48,6 +50,10 @@ function SearchLayout() {
 	const [actionMessage, setActionMessage] = useState<string | null>(null);
 	const actionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const lastAutoSearchedQueryRef = useRef<string | null>(null);
+	const searchSettingsRef = useRef({
+		type: navState.searchType,
+		limit: navState.searchLimit,
+	});
 	const [editingFilter, setEditingFilter] = useState<FilterField | null>(null);
 	const [filterDraft, setFilterDraft] = useState('');
 
@@ -89,13 +95,24 @@ function SearchLayout() {
 
 	// Handle search action
 	const performSearch = useCallback(
-		async (query: string, limitOverride?: number) => {
+		async (query: string, typeOverride?: NavigationState['searchType']) => {
 			if (!query || isSearching) return;
+
+			// Detect YouTube URLs → play instantly instead of searching
+			const videoId = parseVideoId(query);
+			if (videoId && query.includes('://')) {
+				const track = await getTrack(videoId);
+				if (track) {
+					play(track, {clearQueue: true});
+				}
+
+				return;
+			}
 
 			setIsSearching(true);
 			const response = await search(query, {
-				type: navState.searchType,
-				limit: limitOverride ?? navState.searchLimit,
+				type: typeOverride ?? navState.searchType,
+				limit: navState.searchLimit,
 			});
 
 			if (response) {
@@ -108,46 +125,48 @@ function SearchLayout() {
 			}
 			setIsSearching(false);
 		},
-		[search, navState.searchType, navState.searchLimit, dispatch, isSearching],
+		[
+			search,
+			navState.searchType,
+			navState.searchLimit,
+			dispatch,
+			isSearching,
+			getTrack,
+			play,
+		],
 	);
 
-	// Adjust results limit and re-run search when results are showing
+	// Adjust results limit
 	const increaseLimit = useCallback(() => {
-		const nextLimit = Math.min(50, navState.searchLimit + 5);
-		dispatch({category: 'SET_SEARCH_LIMIT', limit: nextLimit});
-		const query = navState.searchQuery.trim();
-		if (navState.hasSearched && query) {
-			void performSearch(query, nextLimit);
-		}
-	}, [
-		navState.searchLimit,
-		navState.searchQuery,
-		navState.hasSearched,
-		dispatch,
-		performSearch,
-	]);
+		dispatch({category: 'SET_SEARCH_LIMIT', limit: navState.searchLimit + 5});
+	}, [navState.searchLimit, dispatch]);
 
 	const decreaseLimit = useCallback(() => {
-		const nextLimit = Math.max(1, navState.searchLimit - 5);
-		dispatch({category: 'SET_SEARCH_LIMIT', limit: nextLimit});
-		const query = navState.searchQuery.trim();
-		if (navState.hasSearched && query) {
-			void performSearch(query, nextLimit);
+		dispatch({category: 'SET_SEARCH_LIMIT', limit: navState.searchLimit - 5});
+	}, [navState.searchLimit, dispatch]);
+
+	useKeyBinding(KEYBINDINGS.INCREASE_RESULTS, increaseLimit);
+	useKeyBinding(KEYBINDINGS.DECREASE_RESULTS, decreaseLimit);
+
+	// Re-search when type or limit changes
+	useEffect(() => {
+		const prev = searchSettingsRef.current;
+		const changed =
+			prev.type !== navState.searchType || prev.limit !== navState.searchLimit;
+		searchSettingsRef.current = {
+			type: navState.searchType,
+			limit: navState.searchLimit,
+		};
+		if (changed && navState.searchQuery && navState.hasSearched) {
+			performSearch(navState.searchQuery);
 		}
 	}, [
+		navState.searchType,
 		navState.searchLimit,
 		navState.searchQuery,
 		navState.hasSearched,
-		dispatch,
 		performSearch,
 	]);
-
-	useKeyBinding(KEYBINDINGS.INCREASE_RESULTS, increaseLimit, {
-		bypassBlock: true,
-	});
-	useKeyBinding(KEYBINDINGS.DECREASE_RESULTS, decreaseLimit, {
-		bypassBlock: true,
-	});
 
 	// Open search history
 	const goToHistory = useCallback(() => {
@@ -157,26 +176,14 @@ function SearchLayout() {
 	}, [isTyping, dispatch]);
 
 	useKeyBinding(['h'], goToHistory);
-	useKeyBinding(
-		KEYBINDINGS.SEARCH_FILTER_ARTIST,
-		() => beginFilterEdit('artist'),
-		{
-			bypassBlock: true,
-		},
+	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_ARTIST, () =>
+		beginFilterEdit('artist'),
 	);
-	useKeyBinding(
-		KEYBINDINGS.SEARCH_FILTER_ALBUM,
-		() => beginFilterEdit('album'),
-		{
-			bypassBlock: true,
-		},
+	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_ALBUM, () =>
+		beginFilterEdit('album'),
 	);
-	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_YEAR, () => beginFilterEdit('year'), {
-		bypassBlock: true,
-	});
-	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_DURATION, cycleDurationFilter, {
-		bypassBlock: true,
-	});
+	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_YEAR, () => beginFilterEdit('year'));
+	useKeyBinding(KEYBINDINGS.SEARCH_FILTER_DURATION, cycleDurationFilter);
 
 	// Initial search if query is in state (usually from CLI flags)
 	useEffect(() => {
@@ -210,13 +217,8 @@ function SearchLayout() {
 		}
 	}, [editingFilter, isTyping, dispatch]);
 
-	// Handle escape in search - go to home
-	const goToHome = useCallback(() => {
-		dispatch({category: 'NAVIGATE', view: VIEW.HOME});
-	}, [dispatch]);
-
 	useKeyBinding(KEYBINDINGS.BACK, goBack);
-	useKeyBinding(['escape'], goToHome, {bypassBlock: true});
+	useKeyBinding(['escape'], goBack, {bypassBlock: true});
 
 	const handleMixCreated = useCallback((message: string) => {
 		setActionMessage(message);
@@ -234,12 +236,10 @@ function SearchLayout() {
 		if (actionTimeoutRef.current) {
 			clearTimeout(actionTimeoutRef.current);
 		}
-		// Downloads can take minutes; keep status visible between track updates.
-		const clearAfterMs = message.startsWith('[') ? 90_000 : 8_000;
 		actionTimeoutRef.current = setTimeout(() => {
 			setActionMessage(null);
 			actionTimeoutRef.current = null;
-		}, clearAfterMs);
+		}, 4000);
 	}, []);
 
 	useEffect(() => {
@@ -278,7 +278,7 @@ function SearchLayout() {
 			: 'Any';
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" flexGrow={1} minHeight={0}>
 			{/* Now Playing indicator */}
 			{playerState.currentTrack && (
 				<Box>
@@ -299,13 +299,13 @@ function SearchLayout() {
 			)}
 
 			<Text color={theme.colors.dim}>
-				Limit: {navState.searchLimit} (Use ] / [ to adjust)
+				Limit: {navState.searchLimit} (Use Ctrl+M/Ctrl+, to adjust)
 			</Text>
 
 			<SearchBar
 				isActive={!editingFilter && isTyping && !isSearching}
-				onInput={input => {
-					void performSearch(input);
+				onInput={(input, type) => {
+					void performSearch(input, type);
 				}}
 			/>
 
@@ -369,7 +369,7 @@ function SearchLayout() {
 			<Text color={theme.colors.dim}>
 				{isTyping
 					? 'Type to search, Enter to start, Esc to clear'
-					: `Arrows navigate, Enter play, W queue, Y play next, M mix, Shift+D download, ]/[ results (${navState.searchLimit}), H history, Esc type`}
+					: `Arrows to navigate, Enter to play, M mix, Shift+D download, [/] less/more results (${navState.searchLimit}), H history, Esc to type`}
 			</Text>
 		</Box>
 	);

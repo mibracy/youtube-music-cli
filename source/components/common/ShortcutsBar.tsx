@@ -1,20 +1,19 @@
 // Shortcuts bar component
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
-import {useNavigation} from '../../hooks/useNavigation.ts';
-import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
+import {KEYBINDINGS} from '../../utils/constants.ts';
 import {ICONS} from '../../utils/icons.ts';
 import {logger} from '../../services/logger/logger.service.ts';
+import {subscribeToNavError} from '../../utils/error.ts';
+import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 
 const FLASH_DURATION_MS = 300;
 
 export default function ShortcutsBar() {
 	const {theme} = useTheme();
-	const {state: navState} = useNavigation();
-	const radioView = navState.currentView === VIEW.RADIO;
 	const {
 		state: playerState,
 		pause,
@@ -33,6 +32,11 @@ export default function ShortcutsBar() {
 	} = usePlayer();
 
 	const [flashState, setFlashState] = useState<Record<string, boolean>>({});
+	const [navError, setNavError] = useState<string | null>(null);
+
+	const {columns} = useTerminalSize();
+
+	useEffect(() => subscribeToNavError(setNavError), []);
 
 	const flash = (key: string) => {
 		setFlashState(prev => ({...prev, [key]: true}));
@@ -93,7 +97,7 @@ export default function ShortcutsBar() {
 		flash('shuffle');
 		toggleShuffle();
 	});
-	useKeyBinding(radioView ? [] : KEYBINDINGS.REPEAT, () => {
+	useKeyBinding(KEYBINDINGS.REPEAT, () => {
 		flash('repeat');
 		toggleRepeat();
 	});
@@ -101,16 +105,19 @@ export default function ShortcutsBar() {
 		flash('autoplay');
 		toggleAutoplay();
 	});
-	useKeyBinding(radioView ? [] : KEYBINDINGS.TOGGLE_RADIO, () => {
+	useKeyBinding(KEYBINDINGS.TOGGLE_RADIO, () => {
 		flash('radio');
 		if (playerState.radioIsActive) {
 			stopRadio();
 		} else if (playerState.currentTrack) {
-			void startRadio({
-				type: 'track',
-				id: playerState.currentTrack.videoId,
-				name: playerState.currentTrack.title,
-			});
+			void startRadio(
+				{
+					type: 'track',
+					id: playerState.currentTrack.videoId,
+					name: playerState.currentTrack.title,
+				},
+				{playNow: false},
+			);
 		}
 	});
 	// Note: SETTINGS keybinding handled by MainLayout to avoid double-dispatch
@@ -137,6 +144,10 @@ export default function ShortcutsBar() {
 			? theme.colors.primary
 			: theme.colors.dim;
 
+	const navAutoplayColor = flashState['autoplay']
+		? theme.colors.success
+		: theme.colors.dim;
+
 	const radioColor = flashState['radio']
 		? theme.colors.success
 		: playerState.radioIsActive
@@ -146,38 +157,50 @@ export default function ShortcutsBar() {
 	return (
 		<Box
 			borderStyle="single"
-			borderColor={theme.colors.dim}
+			borderColor={navError ? theme.colors.warning : theme.colors.dim}
 			paddingX={1}
 			justifyContent="space-between"
 		>
-			{/* Left: Navigation shortcuts */}
-			<Text color={theme.colors.dim}>
-				<Text color={shortcutColor('playPause')}>
-					{playerState.isPlaying ? ICONS.PAUSE : ICONS.PLAY_PAUSE_ON} [Space]
-				</Text>{' '}
-				• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
-				<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text> •{' '}
-				<Text color={shuffleColor}>{ICONS.SHUFFLE} [Sft+S]</Text> •{' '}
-				<Text color={repeatColor}>
-					{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}{' '}
-					[R]
-				</Text>{' '}
-				• <Text color={autoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
-				<Text color={shortcutColor('radio')}>📡 [Shift+X]</Text> •{' '}
-				<Text color={theme.colors.text}>Releases [Sft+N]</Text> •{' '}
-				<Text color={theme.colors.text}>Genres [Sft+M]</Text> •{' '}
-				<Text color={theme.colors.text}>{ICONS.SEARCH} [/]</Text> •{' '}
-				<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
-			</Text>
-
-			{/* Right: Playback mode + volume indicator */}
+			{/* Left: Navigation shortcuts or error message */}
+			{navError ? (
+				<Text color={theme.colors.warning}>
+					{ICONS.WARNING} {navError}
+				</Text>
+			) : (
+				<Text color={theme.colors.dim}>
+					<Text color={shortcutColor('playPause')}>
+						{playerState.isPlaying ? ICONS.PAUSE : ICONS.PLAY_PAUSE_ON} [Space]
+					</Text>{' '}
+					• <Text color={shortcutColor('prev')}>{ICONS.PREV} [B]</Text> •{' '}
+					<Text color={shortcutColor('next')}>{ICONS.NEXT} [N]</Text>
+					{columns >= 140 && (
+						<Text>
+							{' '}
+							• <Text color={theme.colors.dim}>
+								{ICONS.SHUFFLE} [Sft+S]
+							</Text> •{' '}
+							<Text color={theme.colors.dim}>
+								{playerState.repeat === 'one'
+									? ICONS.REPEAT_ONE
+									: ICONS.REPEAT_ALL}{' '}
+								[Sft+L]
+							</Text>{' '}
+							• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
+							<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
+							<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
+						</Text>
+					)}
+				</Text>
+			)}
 			<Text color={theme.colors.text}>
 				<Text color={shuffleColor}>{ICONS.SHUFFLE}</Text>{' '}
 				<Text color={repeatColor}>
 					{playerState.repeat === 'one' ? ICONS.REPEAT_ONE : ICONS.REPEAT_ALL}
 				</Text>{' '}
 				<Text color={autoplayColor}>{ICONS.AUTOPLAY}</Text>{' '}
-				{playerState.radioIsActive && <Text color={radioColor}>📡</Text>}{' '}
+				{playerState.radioIsActive && (
+					<Text color={radioColor}>{ICONS.RADIO}</Text>
+				)}{' '}
 				<Text color={theme.colors.dim}>{ICONS.VOLUME} [+/-]</Text>{' '}
 				<Text color={volumeColor}>{playerState.volume}%</Text>
 			</Text>

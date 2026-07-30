@@ -9,6 +9,7 @@ import {
 	useKeyBinding,
 	registerGoHomeCallback,
 	setCurrentViewForCtrlC,
+	KeyboardManager,
 } from '../../hooks/useKeyboard.tsx';
 import SearchLayout from './SearchLayout.tsx';
 import PlayerLayout from './PlayerLayout.tsx';
@@ -44,8 +45,8 @@ import {usePlayer} from '../../hooks/usePlayer.ts';
 function MainLayout() {
 	const {theme} = useTheme();
 	const {state: navState, dispatch} = useNavigation();
-	const {resume} = usePlayer();
-	const {columns} = useTerminalSize();
+	const {resume, addToQueue, state: playerState} = usePlayer();
+	const {columns, rows} = useTerminalSize();
 
 	// Responsive padding based on terminal size
 	const getPadding = () => (columns < 100 ? 0 : 1);
@@ -88,18 +89,11 @@ function MainLayout() {
 		dispatch({category: 'NAVIGATE', view: VIEW.HELP});
 	}, [dispatch, navState.currentView]);
 
-	const handleQuit = useCallback(() => {
-		// From player view, quit the app
-		if (navState.currentView === VIEW.PLAYER) {
-			process.exit(0);
-		}
-		// From other views, go back
-		dispatch({category: 'GO_BACK'});
-	}, [navState.currentView, dispatch]);
-
 	const goToLyrics = useCallback(() => {
-		dispatch({category: 'NAVIGATE', view: VIEW.LYRICS});
-	}, [dispatch]);
+		if (navState.currentView !== VIEW.LYRICS) {
+			dispatch({category: 'NAVIGATE', view: VIEW.LYRICS});
+		}
+	}, [dispatch, navState.currentView]);
 
 	const goToTrending = useCallback(() => {
 		dispatch({category: 'NAVIGATE', view: VIEW.TRENDING});
@@ -183,15 +177,15 @@ function MainLayout() {
 		dispatch({category: 'TOGGLE_PLAYER_MODE'});
 	}, [dispatch]);
 
+	const handleAddToQueue = useCallback(() => {
+		if (playerState.currentTrack) {
+			addToQueue(playerState.currentTrack);
+		}
+	}, [addToQueue, playerState.currentTrack]);
+
 	// Global keyboard bindings
-	useKeyBinding(KEYBINDINGS.QUIT, handleQuit);
-	useKeyBinding(
-		navState.currentView === VIEW.RADIO ||
-			navState.currentView === VIEW.LIVE_STREAMS
-			? []
-			: KEYBINDINGS.SEARCH,
-		goToSearch,
-	);
+	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, handleAddToQueue);
+	useKeyBinding(KEYBINDINGS.SEARCH, goToSearch);
 	useKeyBinding(KEYBINDINGS.PLAYLISTS, goToPlaylists);
 	useKeyBinding(KEYBINDINGS.PLUGINS, goToPlugins);
 	useKeyBinding(KEYBINDINGS.SUGGESTIONS, goToSuggestions);
@@ -322,13 +316,18 @@ function MainLayout() {
 	return (
 		<Box
 			flexDirection="column"
+			flexGrow={1}
+			minHeight={0}
 			paddingX={getPadding()}
 			borderStyle="single"
 			borderColor={theme.colors.primary}
 		>
-			{currentView}
+			<Box flexGrow={1} minHeight={Math.max(0, rows - 5)}>
+				{currentView}
+			</Box>
 
 			{/* Shortcuts bar at bottom - shows context-relevant shortcuts */}
+			<KeyboardManager />
 			<ShortcutsBar />
 		</Box>
 	);

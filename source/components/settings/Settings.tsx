@@ -11,11 +11,9 @@ import {useSleepTimer} from '../../hooks/useSleepTimer.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {formatTime} from '../../utils/format.ts';
 import type {
-	CookiesFromBrowser,
 	DownloadFormat,
 	EqualizerPreset,
 } from '../../types/config.types.ts';
-import {nextCookiesFromBrowser} from '../../services/player/ytdl-cookies.ts';
 
 const QUALITIES: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
 const DOWNLOAD_FORMATS: DownloadFormat[] = ['mp3', 'm4a'];
@@ -60,9 +58,6 @@ const SETTINGS_ITEMS = [
 	'Downloads Enabled',
 	'Download Folder',
 	'Download Format',
-	'Prefer Local Playback',
-	'Cookies From Browser',
-	'Cookies File',
 	'Sleep Timer',
 	'Import Playlists',
 	'Export Playlists',
@@ -109,13 +104,6 @@ export default function Settings() {
 	const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(
 		config.get('downloadFormat') ?? 'mp3',
 	);
-	const [preferLocalPlayback, setPreferLocalPlayback] = useState(
-		config.get('preferLocalPlayback') ?? true,
-	);
-	const [cookiesFromBrowser, setCookiesFromBrowser] = useState<
-		CookiesFromBrowser | undefined
-	>(config.get('cookiesFromBrowser'));
-	const [isEditingCookiesFile, setIsEditingCookiesFile] = useState(false);
 	const [llmEnabled, setLLMEnabled] = useState(config.getLLMEnabled());
 	const [llmApiKey, setLLMApiKey] = useState(config.getLLMApiKey() ?? '');
 	const [llmModel, setLLMModel] = useState(
@@ -154,12 +142,7 @@ export default function Settings() {
 	);
 
 	const navigateUp = () => {
-		if (
-			isEditingApiKey ||
-			isEditingDownloadDirectory ||
-			isEditingBaseUrl ||
-			isEditingCookiesFile
-		) {
+		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
 			return;
 		}
 		if (selectedIndex > 0) {
@@ -170,12 +153,7 @@ export default function Settings() {
 	};
 
 	const navigateDown = (): void => {
-		if (
-			isEditingApiKey ||
-			isEditingDownloadDirectory ||
-			isEditingBaseUrl ||
-			isEditingCookiesFile
-		) {
+		if (isEditingApiKey || isEditingDownloadDirectory || isEditingBaseUrl) {
 			return;
 		}
 		if (selectedIndex < visibleSettings.length - 1) {
@@ -266,18 +244,6 @@ export default function Settings() {
 			DOWNLOAD_FORMATS[(currentIndex + 1) % DOWNLOAD_FORMATS.length]!;
 		setDownloadFormat(nextFormat);
 		config.set('downloadFormat', nextFormat);
-	};
-
-	const togglePreferLocalPlayback = () => {
-		const next = !preferLocalPlayback;
-		setPreferLocalPlayback(next);
-		config.set('preferLocalPlayback', next);
-	};
-
-	const cycleCookiesFromBrowser = () => {
-		const next = nextCookiesFromBrowser(cookiesFromBrowser);
-		setCookiesFromBrowser(next);
-		config.set('cookiesFromBrowser', next);
 	};
 
 	const toggleLLMEnabled = () => {
@@ -381,20 +347,14 @@ export default function Settings() {
 		} else if (actualIndex === 18) {
 			cycleDownloadFormat();
 		} else if (actualIndex === 19) {
-			togglePreferLocalPlayback();
-		} else if (actualIndex === 20) {
-			cycleCookiesFromBrowser();
-		} else if (actualIndex === 21) {
-			setIsEditingCookiesFile(true);
-		} else if (actualIndex === 22) {
 			cycleSleepTimer();
-		} else if (actualIndex === 23) {
+		} else if (actualIndex === 20) {
 			dispatch({category: 'NAVIGATE', view: VIEW.IMPORT});
-		} else if (actualIndex === 24) {
+		} else if (actualIndex === 21) {
 			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
-		} else if (actualIndex === 25) {
+		} else if (actualIndex === 22) {
 			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
-		} else if (actualIndex === 26) {
+		} else if (actualIndex === 23) {
 			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
 		}
 	};

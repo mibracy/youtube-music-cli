@@ -84,7 +84,7 @@ function getMusicShelfItems(shelf: unknown): MusicSearchItem[] {
 	);
 }
 
-function parseVideoId(value: string): string | null {
+export function parseVideoId(value: string): string | null {
 	const trimmedValue = value.trim();
 	if (!trimmedValue) {
 		return null;

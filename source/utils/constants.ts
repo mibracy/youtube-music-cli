@@ -113,7 +113,6 @@ export const KEYBINDINGS = {
 	NEXT: ['n'],
 	PREVIOUS: ['b'],
 	ADD_TO_QUEUE: ['q'],
-	PLAY_NEXT: ['y'],
 	VOLUME_UP: ['=', '+'], // '=' (no shift) or '+' (shift+=) both trigger volume up
 	VOLUME_DOWN: ['-'], // '-' triggers volume down
 	VOLUME_FINE_UP: ['ctrl+='], // Fine-grained +1 step (Ctrl+= to avoid conflict with '+')
@@ -131,8 +130,6 @@ export const KEYBINDINGS = {
 	AB_LOOP_A: ['{'],
 	AB_LOOP_B: ['}'],
 	AB_LOOP_CLEAR: ['|'],
-	CREATE_MIX: ['m'],
-	DOWNLOAD: ['shift+d'],
 
 	// New Views Shortcuts (Optional, we'll map them later if needed)
 	GENRES: ['shift+m'],
@@ -144,13 +141,6 @@ export const KEYBINDINGS = {
 	SELECT: ['enter', 'return'],
 	BACK: ['escape'],
 
-	// Playlist
-	ADD_TO_PLAYLIST: ['a'],
-	REMOVE_FROM_PLAYLIST: ['d'],
-	CREATE_PLAYLIST: ['c'],
-	DELETE_PLAYLIST: ['D'],
-	RENAME_PLAYLIST: ['r'],
-
 	// Search
 	CLEAR_SEARCH: ['escape'],
 	INCREASE_RESULTS: [']'],
@@ -160,6 +150,15 @@ export const KEYBINDINGS = {
 	SEARCH_FILTER_ALBUM: ['ctrl+l'],
 	SEARCH_FILTER_YEAR: ['ctrl+y'],
 	SEARCH_FILTER_DURATION: ['ctrl+d'],
+
+	// Playlist
+	ADD_TO_PLAYLIST: ['a'],
+	REMOVE_FROM_PLAYLIST: ['d'],
+	CREATE_PLAYLIST: ['c'],
+	CREATE_MIX: ['m'],
+	DELETE_PLAYLIST: ['D'],
+	DOWNLOAD: ['shift+d'],
+	RENAME_PLAYLIST: ['r'],
 } as const;
 
 // Default volume

@@ -10,26 +10,10 @@ import {
 import type {PlayerState, PlayerAction} from '../types/player.types.ts';
 import {getPlayerService} from '../services/player/player.service.ts';
 import {
-	formatPlaybackErrorMessage,
-	isYouTubeBotCheckError,
-} from '../services/player/ytdl-cookies.ts';
-import {
 	loadPlayerState,
 	savePlayerState,
 } from '../services/player-state/player-state.service.ts';
 import {logger} from '../services/logger/logger.service.ts';
-import {
-	PLAYBACK_STALL_MS,
-	shouldApplyMpvPauseSync,
-} from '../services/player/mpv-event-policy.ts';
-import {
-	buildAutoplaySeedPlan,
-	mergeSuggestionTracksForAutoplay,
-	recordSessionTrack,
-	shouldLoopExplicitQueue,
-	shouldPrefetchAutoplay,
-	shouldResumeAfterPrefetch,
-} from '../services/player/autoplay-coordinator.ts';
 import {getNotificationService} from '../services/notification/notification.service.ts';
 import {getScrobblingService} from '../services/scrobbling/scrobbling.service.ts';
 import {getDiscordRpcService} from '../services/discord/discord-rpc.service.ts';
@@ -59,14 +43,11 @@ const initialState: PlayerState = {
 	radioIsActive: false,
 	radioSeed: null,
 	explicitQueueLength: 0,
-	playbackMode: 'youtube',
+	playbackMode: 'youtube' as const,
 	currentStation: null,
 	streamNowPlaying: null,
 	mediaSource: null,
 };
-
-let inkSessionHistory: string[] = [];
-let inkHistorySeedCursor = 0;
 
 // Get player service instance
 const playerService = getPlayerService();
@@ -79,17 +60,12 @@ export function playerReducer(
 		case 'PLAY':
 			return {
 				...state,
-				playbackMode: 'youtube',
-				currentStation: null,
-				streamNowPlaying: null,
-				mediaSource: null,
 				currentTrack: action.track,
 				isPlaying: true,
 				progress: 0,
+				duration: 0,
 				error: null,
 				playRequestId: state.playRequestId + 1,
-				explicitQueueLength:
-					state.queue.length > 0 ? state.explicitQueueLength || 1 : 1,
 			};
 
 		case 'PAUSE': {
@@ -117,10 +93,6 @@ export function playerReducer(
 				isPlaying: false,
 				progress: 0,
 				currentTrack: null,
-				playbackMode: 'youtube',
-				currentStation: null,
-				streamNowPlaying: null,
-				mediaSource: null,
 			};
 
 		case 'NEXT': {
@@ -142,15 +114,17 @@ export function playerReducer(
 				};
 			}
 
+			// If the current track isn't in the queue (standalone play),
+			// advance to the first track in the queue instead of skipping it
+			const currentInQueue = state.queue.some(
+				t => t.videoId === state.currentTrack?.videoId,
+			);
+			const basePosition = currentInQueue ? state.queuePosition : -1;
+
 			// Sequential mode
-			const nextPosition = state.queuePosition + 1;
+			const nextPosition = basePosition + 1;
 			if (nextPosition >= state.queue.length) {
-				if (
-					shouldLoopExplicitQueue({
-						autoplay: state.autoplay,
-						repeat: state.repeat,
-					})
-				) {
+				if (state.repeat === 'all') {
 					return {
 						...state,
 						queuePosition: 0,
@@ -194,6 +168,7 @@ export function playerReducer(
 		}
 
 		case 'SEEK':
+			getPlayerService().seek(action.position);
 			return {
 				...state,
 				progress: Math.max(0, Math.min(action.position, state.duration)),
@@ -256,30 +231,10 @@ export function playerReducer(
 				...state,
 				queue: action.queue,
 				queuePosition: 0,
-				explicitQueueLength: action.queue.length,
 			};
 
 		case 'ADD_TO_QUEUE':
-			return {
-				...state,
-				queue: [...state.queue, action.track],
-				explicitQueueLength:
-					(state.explicitQueueLength ?? state.queue.length) + 1,
-			};
-
-		case 'PLAY_NEXT': {
-			const insertAt = Math.min(state.queuePosition + 1, state.queue.length);
-			const newQueue = [...state.queue];
-			newQueue.splice(insertAt, 0, action.track);
-			const explicitBase = state.explicitQueueLength ?? state.queue.length;
-			const explicitQueueLength =
-				insertAt <= explicitBase ? explicitBase + 1 : explicitBase;
-			return {
-				...state,
-				queue: newQueue,
-				explicitQueueLength,
-			};
-		}
+			return {...state, queue: [...state.queue, action.track]};
 
 		case 'REMOVE_FROM_QUEUE': {
 			const newQueue = [...state.queue];
@@ -294,6 +249,14 @@ export function playerReducer(
 				queuePosition: 0,
 				isPlaying: false,
 			};
+
+		case 'CLEAR_QUEUE_AFTER_CURRENT': {
+			const cutoff = state.queuePosition + 1;
+			return {
+				...state,
+				queue: state.queue.slice(0, cutoff),
+			};
+		}
 
 		case 'SET_QUEUE_POSITION':
 			if (action.position >= 0 && action.position < state.queue.length) {
@@ -333,17 +296,12 @@ export function playerReducer(
 		case 'SET_LOADING':
 			return {...state, isLoading: action.loading};
 
-		case 'SET_MEDIA_SOURCE':
-			return {...state, mediaSource: action.mediaSource};
-
 		case 'SET_ERROR':
-			// Only force paused on a real error — clearing (`null`) must not flip
-			// isPlaying or the UI can show paused while orphan mpv keeps playing.
 			return {
 				...state,
 				error: action.error,
 				isLoading: false,
-				...(action.error ? {isPlaying: false} : {}),
+				isPlaying: false,
 			};
 
 		case 'SET_SPEED': {
@@ -393,21 +351,12 @@ export function playerReducer(
 				progress: 0,
 				duration: 0,
 				error: null,
-				playRequestId: state.playRequestId + 1,
-			};
-
-		case 'SET_STREAM_NOW_PLAYING':
-			return {
-				...state,
-				streamNowPlaying: action.streamNowPlaying,
 			};
 
 		case 'RESTORE_STATE':
 			logger.info('PlayerReducer', 'RESTORE_STATE', {
 				hasTrack: !!action.currentTrack,
 				queueLength: action.queue.length,
-				playbackMode: action.playbackMode ?? 'youtube',
-				hasStation: !!action.currentStation,
 			});
 			return {
 				...state,
@@ -417,14 +366,8 @@ export function playerReducer(
 				shuffle: action.shuffle,
 				repeat: action.repeat,
 				autoplay: action.autoplay ?? true,
-				explicitQueueLength: action.explicitQueueLength ?? action.queue.length,
-				isPlaying: false,
+				isPlaying: false, // Don't auto-play restored state
 				abLoop: {a: null, b: null},
-				playbackMode: action.playbackMode ?? 'youtube',
-				currentStation: action.currentStation ?? null,
-				streamNowPlaying: null,
-				radioIsActive: action.radioIsActive ?? false,
-				radioSeed: action.radioSeed ?? null,
 			};
 
 		default:
@@ -437,7 +380,7 @@ import type {Track} from '../types/youtube-music.types.ts';
 type PlayerContextValue = {
 	state: PlayerState;
 	dispatch: (action: PlayerAction) => void;
-	play: (track: Track) => void;
+	play: (track: Track, options?: {clearQueue?: boolean}) => void;
 	pause: () => void;
 	resume: () => void;
 	stop: () => void;
@@ -454,7 +397,6 @@ type PlayerContextValue = {
 	toggleAutoplay: () => void;
 	setQueue: (queue: Track[]) => void;
 	addToQueue: (track: Track) => void;
-	playNext: (track: Track) => void;
 	removeFromQueue: (index: number) => void;
 	clearQueue: () => void;
 	setQueuePosition: (position: number) => void;
@@ -462,13 +404,12 @@ type PlayerContextValue = {
 	speedUp: () => void;
 	speedDown: () => void;
 	setABLoop: (a: number | null, b: number | null) => void;
-	startRadio: (seed: RadioSeed) => void;
+	startRadio: (seed: RadioSeed, options?: {playNow?: boolean}) => void;
 	stopRadio: () => void;
 };
 
 import {getConfigService} from '../services/config/config.service.ts';
 import {getMusicService} from '../services/youtube-music/api.ts';
-import {resolveTrackPlayUrl} from '../utils/local-track.ts';
 import {useMemo} from 'react';
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -491,61 +432,10 @@ function PlayerManager() {
 
 	// Register event handler for mpv IPC events
 	const eofTimestampRef = useRef(0);
-	const playbackModeRef = useRef(state.playbackMode);
 	const lastAutoNextRef = useRef(0);
-	const currentVideoIdForEventsRef = useRef<string | undefined>(undefined);
-	const isPlayingRef = useRef(state.isPlaying);
-	const lastProgressAtRef = useRef(0);
-	const ipcReconnectAttemptRef = useRef(0);
-
-	useEffect(() => {
-		playbackModeRef.current = state.playbackMode;
-	}, [state.playbackMode]);
-
-	useEffect(() => {
-		isPlayingRef.current = state.isPlaying;
-		if (state.isPlaying && lastProgressAtRef.current === 0) {
-			lastProgressAtRef.current = Date.now();
-		}
-	}, [state.isPlaying]);
-
-	// Sync ref outside of render via effect so the event handler always sees the latest videoId
-	useEffect(() => {
-		currentVideoIdForEventsRef.current = state.currentTrack?.videoId;
-	});
-
 	useEffect(() => {
 		let lastProgressUpdate = 0;
 		const PROGRESS_THROTTLE_MS = 1000; // Update progress max once per second
-		// Track whether the current track received any progress events.
-		// If EOF fires without any progress, the track was unavailable/failed.
-		let hasProgress = false;
-
-		const attemptIpcRecover = async (): Promise<void> => {
-			ipcReconnectAttemptRef.current += 1;
-			const attempt = ipcReconnectAttemptRef.current;
-			logger.warn('PlayerManager', 'Recovering from IPC disconnect', {
-				attempt,
-			});
-			const reconnected = await playerService.tryReconnectIpc();
-			if (attempt !== ipcReconnectAttemptRef.current) {
-				return;
-			}
-			if (reconnected) {
-				lastProgressAtRef.current = Date.now();
-				if (isPlayingRef.current) {
-					await playerService.resume();
-					dispatch({category: 'RESUME'});
-				}
-				dispatch({category: 'SET_ERROR', error: null});
-				return;
-			}
-
-			dispatch({
-				category: 'SET_ERROR',
-				error: 'Lost connection to mpv — press Space to resume',
-			});
-		};
 
 		playerService.onEvent(event => {
 			// Log all events at debug level to trace volume-pause correlation
@@ -558,18 +448,11 @@ function PlayerManager() {
 				});
 			}
 
-			if (event.ipcDisconnected) {
-				void attemptIpcRecover();
-				return;
-			}
-
 			if (event.duration !== undefined) {
 				dispatch({category: 'SET_DURATION', duration: event.duration});
 			}
 
 			if (event.timePos !== undefined) {
-				hasProgress = true;
-				lastProgressAtRef.current = Date.now();
 				// Throttle progress updates to reduce re-renders
 				const now = Date.now();
 				if (now - lastProgressUpdate >= PROGRESS_THROTTLE_MS) {
@@ -579,44 +462,20 @@ function PlayerManager() {
 			}
 
 			if (event.eof) {
-				if (playbackModeRef.current === 'stream') {
-					return;
-				}
-
+				// Track ended — record timestamp so we can suppress mpv's spurious
+				// pause event that immediately follows EOF (idle state).
 				const now = Date.now();
 				eofTimestampRef.current = now;
-
-				if (hasProgress) {
-					// Track ended normally — advance to next track
-					next();
-					lastAutoNextRef.current = now;
-				} else {
-					// No progress received — track was unavailable or failed to play.
-					// Set error instead of looping infinitely.
-					logger.warn(
-						'PlayerManager',
-						'EOF without progress — track may be unavailable',
-						{
-							videoId: currentVideoIdForEventsRef.current,
-						},
-					);
-					dispatch({
-						category: 'SET_ERROR',
-						error: 'Track unavailable or failed to play',
-					});
-				}
-
-				hasProgress = false;
+				next();
+				lastAutoNextRef.current = now;
 			}
 
 			if (event.paused !== undefined) {
-				if (
-					!shouldApplyMpvPauseSync({
-						paused: event.paused,
-						eofTimestamp: eofTimestampRef.current,
-					})
-				) {
-					logger.debug('PlayerManager', 'Pause suppressed (EOF or advancing)', {
+				// mpv sends pause=true when a track ends and it enters idle mode.
+				// Suppress this for ~2s after EOF to prevent it from overwriting
+				// the isPlaying:true set by NEXT, which would block autoplay.
+				if (event.paused && Date.now() - eofTimestampRef.current < 2000) {
+					logger.debug('PlayerManager', 'Pause suppressed (EOF within 2s)', {
 						timeSinceEofMs: Date.now() - eofTimestampRef.current,
 					});
 					return;
@@ -630,72 +489,8 @@ function PlayerManager() {
 					dispatch({category: 'RESUME'});
 				}
 			}
-
-			if (event.subtitle !== undefined) {
-				dispatch({category: 'SET_SUBTITLE', subtitle: event.subtitle});
-			}
-
-			if (event.streamMetadata !== undefined) {
-				if (playbackModeRef.current === 'stream') {
-					dispatch({
-						category: 'SET_STREAM_NOW_PLAYING',
-						streamNowPlaying: event.streamMetadata,
-					});
-				}
-			}
 		});
 	}, [playerService, dispatch, next]);
-
-	// Recover when progress freezes while UI thinks we are playing (IPC often dropped).
-	useEffect(() => {
-		const stallWatchdog = setInterval(() => {
-			if (!isPlayingRef.current) {
-				lastProgressAtRef.current = Date.now();
-				return;
-			}
-
-			if (Date.now() - lastProgressAtRef.current < PLAYBACK_STALL_MS) {
-				return;
-			}
-
-			if (playerService.hasActivePlaybackSession()) {
-				// Socket alive but no ticks — likely buffering; keep waiting.
-				return;
-			}
-
-			if (!playerService.hasMpvProcess()) {
-				dispatch({
-					category: 'SET_ERROR',
-					error: 'Playback stopped unexpectedly',
-				});
-				return;
-			}
-
-			logger.warn(
-				'PlayerManager',
-				'Progress stalled without IPC — attempting reconnect',
-			);
-			void playerService.tryReconnectIpc().then(async ok => {
-				if (!isPlayingRef.current) {
-					return;
-				}
-				if (ok) {
-					lastProgressAtRef.current = Date.now();
-					await playerService.resume();
-					dispatch({category: 'SET_ERROR', error: null});
-					return;
-				}
-				dispatch({
-					category: 'SET_ERROR',
-					error: 'Lost connection to mpv — press Space to resume',
-				});
-			});
-		}, 1000);
-
-		return () => {
-			clearInterval(stallWatchdog);
-		};
-	}, [dispatch, playerService]);
 
 	// Initialize audio on mount
 	useEffect(() => {
@@ -760,16 +555,7 @@ function PlayerManager() {
 			// to the still-running mpv process instead of spawning a new one.
 			const config = getConfigService();
 			const bgState = config.getBackgroundPlaybackState();
-			const resolved = resolveTrackPlayUrl(track, {
-				preferLocal: config.get('preferLocalPlayback') ?? true,
-				downloadDirectory: config.get('downloadDirectory'),
-				downloadFormat: config.get('downloadFormat') ?? 'mp3',
-			});
-			const trackUrl = resolved.url;
-			dispatch({
-				category: 'SET_MEDIA_SOURCE',
-				mediaSource: resolved.source,
-			});
+			const trackUrl = `https://www.youtube.com/watch?v=${track.videoId}`;
 			if (
 				bgState.enabled &&
 				bgState.ipcPath &&
@@ -808,9 +594,10 @@ function PlayerManager() {
 						videoId: track.videoId,
 						volume: state.volume,
 						attempt,
-						source: resolved.source,
 					});
 
+					// Pass YouTube URL directly to mpv (it handles stream extraction via yt-dlp)
+					const youtubeUrl = `https://www.youtube.com/watch?v=${track.videoId}`;
 					const config = getConfigService();
 					const artists =
 						track.artists?.map(a => a.name).join(', ') ?? 'Unknown';
@@ -851,23 +638,19 @@ function PlayerManager() {
 						true,
 					);
 
-					await playerService.play(trackUrl, {
+					await playerService.play(youtubeUrl, {
 						volume: state.volume,
 						audioNormalization: config.get('audioNormalization') ?? false,
 						proxy: config.get('proxy'),
-						cookiesFile: config.get('cookiesFile'),
-						cookiesFromBrowser: config.get('cookiesFromBrowser'),
 						gaplessPlayback: config.get('gaplessPlayback') ?? true,
 						crossfadeDuration: config.get('crossfadeDuration') ?? 0,
 						equalizerPreset: config.get('equalizerPreset') ?? 'flat',
 						volumeFadeDuration: config.get('volumeFadeDuration') ?? 0,
 						duration: track.duration,
-						trackId: track.videoId,
 					});
 
 					logger.info('PlayerManager', 'Playback started successfully', {
 						attempt,
-						source: resolved.source,
 					});
 					dispatch({category: 'SET_LOADING', loading: false});
 					return; // Success
@@ -877,57 +660,6 @@ function PlayerManager() {
 						track: {title: track.title, videoId: track.videoId},
 						attempt,
 					});
-
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-
-					if (
-						resolved.source === 'youtube' &&
-						attempt === MAX_RETRIES &&
-						isYouTubeBotCheckError(errorMessage)
-					) {
-						try {
-							logger.info(
-								'PlayerManager',
-								'Bot check detected; retrying with extracted stream URL',
-								{videoId: track.videoId},
-							);
-							const fallbackConfig = getConfigService();
-							const streamUrl = await musicService.getStreamUrl(track.videoId);
-							await playerService.play(streamUrl, {
-								volume: state.volume,
-								audioNormalization:
-									fallbackConfig.get('audioNormalization') ?? false,
-								proxy: fallbackConfig.get('proxy'),
-								gaplessPlayback: fallbackConfig.get('gaplessPlayback') ?? true,
-								crossfadeDuration: fallbackConfig.get('crossfadeDuration') ?? 0,
-								equalizerPreset:
-									fallbackConfig.get('equalizerPreset') ?? 'flat',
-								volumeFadeDuration:
-									fallbackConfig.get('volumeFadeDuration') ?? 0,
-								duration: track.duration,
-								trackId: track.videoId,
-							});
-							dispatch({category: 'SET_LOADING', loading: false});
-							return;
-						} catch (streamError) {
-							logger.error(
-								'PlayerManager',
-								'Stream URL fallback after bot check failed',
-								{
-									error:
-										streamError instanceof Error
-											? streamError.message
-											: String(streamError),
-								},
-							);
-							dispatch({
-								category: 'SET_ERROR',
-								error: formatPlaybackErrorMessage(error),
-							});
-							return;
-						}
-					}
 
 					if (attempt < MAX_RETRIES) {
 						logger.info('PlayerManager', 'Retrying playback', {
@@ -939,7 +671,10 @@ function PlayerManager() {
 					} else {
 						dispatch({
 							category: 'SET_ERROR',
-							error: `${formatPlaybackErrorMessage(error)} (after ${MAX_RETRIES} attempts)`,
+							error:
+								error instanceof Error
+									? `${error.message} (after ${MAX_RETRIES} attempts)`
+									: 'Failed to load track',
 						});
 					}
 				}
@@ -955,86 +690,6 @@ function PlayerManager() {
 		state.playRequestId,
 		dispatch,
 		musicService,
-	]);
-
-	useEffect(() => {
-		const station = state.currentStation;
-		if (state.playbackMode !== 'stream' || !station) {
-			return;
-		}
-
-		if (!state.isPlaying) {
-			return;
-		}
-
-		const currentTrackId = playerService.getCurrentTrackId() || '';
-		const isSameStation = currentTrackId === station.id;
-		const isNewPlayRequest =
-			state.playRequestId !== lastPlayedRequestId.current;
-		if (isSameStation && !isNewPlayRequest) {
-			return;
-		}
-
-		lastPlayedRequestId.current = state.playRequestId;
-
-		const loadAndPlayStream = async () => {
-			dispatch({category: 'SET_LOADING', loading: true});
-			const config = getConfigService();
-			const MAX_RETRIES = 3;
-			const RETRY_DELAY_MS = 1500;
-
-			for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-				try {
-					await playerService.play(station.streamUrl, {
-						volume: state.volume,
-						trackId: station.id,
-						audioNormalization: config.get('audioNormalization') ?? false,
-						proxy: config.get('proxy'),
-						gaplessPlayback: config.get('gaplessPlayback') ?? true,
-						crossfadeDuration: config.get('crossfadeDuration') ?? 0,
-						equalizerPreset: config.get('equalizerPreset') ?? 'flat',
-						volumeFadeDuration: config.get('volumeFadeDuration') ?? 0,
-					});
-
-					if (attempt === 1 && config.get('notifications')) {
-						const notificationService = getNotificationService();
-						notificationService.setEnabled(true);
-						void notificationService.notifyTrackChange(station.name, 'LIVE');
-					}
-
-					dispatch({category: 'SET_LOADING', loading: false});
-					return;
-				} catch (error) {
-					logger.error('PlayerManager', 'Failed to load radio stream', {
-						error: error instanceof Error ? error.message : String(error),
-						station: {id: station.id, name: station.name},
-						attempt,
-					});
-
-					if (attempt < MAX_RETRIES) {
-						await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-					} else {
-						dispatch({
-							category: 'SET_ERROR',
-							error:
-								error instanceof Error
-									? `${error.message} (after ${MAX_RETRIES} attempts)`
-									: 'Failed to load radio stream',
-						});
-					}
-				}
-			}
-		};
-
-		void loadAndPlayStream();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [
-		state.playbackMode,
-		state.currentStation,
-		state.isPlaying,
-		state.playRequestId,
-		dispatch,
-		playerService,
 	]);
 
 	// Handle progress tracking
@@ -1088,44 +743,27 @@ function PlayerManager() {
 
 	// Handle play/pause state
 	useEffect(() => {
-		// Identify the currently active media (track or live/radio stream) so
-		// pause/resume works regardless of playback mode.
-		const activeId =
-			state.playbackMode === 'stream'
-				? state.currentStation?.id
-				: state.currentTrack?.videoId;
-
 		if (state.isPlaying) {
-			// Resume only if the same track/station is already loaded in the player
-			// service. If it changed, the track/stream effects will call play().
+			// Resume only if the same track is already loaded in the player service.
+			// If the track changed, the "handle track changes" effect will call play().
 			const currentTrackId = playerService.getCurrentTrackId?.() ?? '';
 			logger.debug('PlayerManager', 'Play/pause effect', {
 				isPlaying: state.isPlaying,
 				currentTrackId,
-				activeId,
+				stateVideoId: state.currentTrack?.videoId,
 			});
-			if (!currentTrackId || activeId === currentTrackId) {
-				void playerService.resume();
+			if (currentTrackId && state.currentTrack?.videoId === currentTrackId) {
+				playerService.resume();
 			} else {
 				logger.debug('PlayerManager', 'Skipping resume', {
 					currentTrackId,
-					activeId,
+					stateVideoId: state.currentTrack?.videoId,
 				});
 			}
-		} else if (
-			playerService.hasActivePlaybackSession() ||
-			playerService.hasMpvProcess()
-		) {
-			// Reconnect-capable pause — keeps UI and orphan mpv in sync on Windows.
-			void playerService.pause();
+		} else {
+			playerService.pause();
 		}
-	}, [
-		state.isPlaying,
-		state.currentTrack,
-		state.playbackMode,
-		state.currentStation,
-		playerService,
-	]);
+	}, [state.isPlaying, state.currentTrack, playerService]);
 
 	// Handle volume changes
 	useEffect(() => {
@@ -1187,125 +825,89 @@ function PlayerManager() {
 	// Smart autoplay: fetch suggestions when near end of queue
 	const fetchedForRef = useRef<string | null>(null);
 	const isFetchingAutoplayRef = useRef(false);
-	const lastAutoplayFetchRef = useRef<number>(0);
-	const AUTOPLAY_FETCH_COOLDOWN_MS = 2000;
-
 	useEffect(() => {
-		if (state.currentTrack?.videoId) {
-			inkSessionHistory = recordSessionTrack(
-				inkSessionHistory,
-				state.currentTrack.videoId,
-			);
+		if (!state.autoplay || !state.currentTrack || !state.isPlaying) {
+			return;
 		}
-	}, [state.currentTrack?.videoId]);
 
-	useEffect(() => {
-		const autoplayState = {
-			autoplay: state.autoplay,
-			isPlaying: state.isPlaying,
-			repeat: state.repeat,
-			shuffle: state.shuffle,
-			queueLength: state.queue.length,
-			queuePosition: state.queuePosition,
-			currentTrackVideoId: state.currentTrack?.videoId ?? null,
-			radioIsActive: state.radioIsActive,
-			explicitQueueLength: state.explicitQueueLength,
-		};
+		if (state.repeat === 'all' || (state.shuffle && state.queue.length > 1)) {
+			return;
+		}
+
+		// Don't fetch suggestions when playing through a queue (playlist, etc.)
+		// Only fetch for standalone tracks not part of the queue
+		const trackInQueue = state.queue.some(
+			t => t.videoId === state.currentTrack?.videoId,
+		);
+		if (trackInQueue) return;
+
+		// In radio mode, fetch more aggressively (when ≤15 tracks ahead)
+		// In regular autoplay, only fetch when ≤5 tracks ahead
+		const tracksAheadThreshold = state.radioIsActive ? 15 : 5;
+		const tracksAhead = state.queue.length - state.queuePosition - 1;
+		if (tracksAhead > tracksAheadThreshold) return;
 
 		if (
-			!shouldPrefetchAutoplay(autoplayState, {
-				fetchedForVideoId: fetchedForRef.current,
-				isFetching: isFetchingAutoplayRef.current,
-			})
+			fetchedForRef.current === state.currentTrack.videoId ||
+			isFetchingAutoplayRef.current
 		) {
 			return;
 		}
 
-		const now = Date.now();
-		if (now - lastAutoplayFetchRef.current < AUTOPLAY_FETCH_COOLDOWN_MS) {
-			return;
-		}
-		lastAutoplayFetchRef.current = now;
-
-		const trackId = state.currentTrack!.videoId;
-		const trackTitle = state.currentTrack!.title;
-		const queueLengthBefore = state.queue.length;
-		const wasAtEndOfQueue = state.queuePosition >= queueLengthBefore - 1;
-		const progressBefore = state.progress;
-		const durationBefore = state.duration;
-
+		const trackId = state.currentTrack.videoId;
+		const trackTitle = state.currentTrack.title;
 		isFetchingAutoplayRef.current = true;
+		fetchedForRef.current = trackId;
 
-		const runFetch = async (): Promise<void> => {
-			const {seeds, nextCursor} = buildAutoplaySeedPlan(
-				trackId,
-				inkSessionHistory,
-				inkHistorySeedCursor,
-			);
-			inkHistorySeedCursor = nextCursor;
+		const fetchPromise =
+			state.radioIsActive && state.radioSeed
+				? getRadioService().fetchMoreTracks(state.radioSeed)
+				: musicService.getSuggestions(trackId);
 
-			const queueIds = new Set(state.queue.map(t => t.videoId).filter(Boolean));
-			const recentPlayedIds = new Set(inkSessionHistory);
-
-			let tracksToAdd: Track[] = [];
-			for (const seed of seeds) {
-				const rawTracks =
-					state.radioIsActive && state.radioSeed
-						? await getRadioService().fetchMoreTracks(state.radioSeed)
-						: await musicService.getSuggestions(seed);
-				const merged = mergeSuggestionTracksForAutoplay(
-					recentPlayedIds,
-					queueIds,
-					rawTracks,
-				);
-				if (merged.length > 0) {
-					tracksToAdd = merged;
-					fetchedForRef.current = seed;
-					break;
+		fetchPromise
+			.then(tracks => {
+				for (const track of tracks) {
+					dispatch({category: 'ADD_TO_QUEUE', track});
 				}
-			}
 
-			for (const track of tracksToAdd) {
-				dispatch({category: 'ADD_TO_QUEUE', track});
-			}
-
-			if (tracksToAdd.length > 0) {
 				logger.info(
 					state.radioIsActive ? 'Radio' : 'Autoplay',
 					state.radioIsActive
 						? 'Radio: added tracks'
 						: 'Autoplay: added suggestions',
 					{
-						count: tracksToAdd.length,
+						count: tracks.length,
 						basedOn: trackTitle,
 						radioMode: state.radioIsActive,
 					},
 				);
 
+				// Check if we need to advance immediately (if we were stuck at the end)
+				// We check if the queue position was at the end of the *previous* queue length
+				// (current queue length - new suggestions length - 1)
+				const wasAtEndOfQueue = state.queuePosition >= state.queue.length - 1;
+
+				// Relaxed check: if we are near the end of the track (within 5s), trigger NEXT.
+				// We do NOT check !state.isPlaying because mpv might be in a weird state
+				// (idle but suppressed pause) if the track actually finished.
 				if (
-					shouldResumeAfterPrefetch(
-						wasAtEndOfQueue,
-						progressBefore,
-						durationBefore,
-					)
+					wasAtEndOfQueue &&
+					state.duration > 0 &&
+					state.progress >= state.duration - 5
 				) {
 					logger.info(
 						'PlayerManager',
 						'Autoplay: resuming playback via freshly added suggestions',
 						{
-							progress: progressBefore,
-							duration: durationBefore,
+							progress: state.progress,
+							duration: state.duration,
 						},
 					);
 					dispatch({category: 'NEXT'});
 				}
-			} else {
-				fetchedForRef.current = null;
-			}
-		};
-
-		runFetch()
+			})
 			.catch((error: unknown) => {
+				isFetchingAutoplayRef.current = false;
 				fetchedForRef.current = null;
 				logger.warn('PlayerManager', 'Autoplay: failed to fetch suggestions', {
 					error: error instanceof Error ? error.message : String(error),
@@ -1324,7 +926,6 @@ function PlayerManager() {
 		state.queuePosition,
 		state.radioIsActive,
 		state.radioSeed,
-		state.explicitQueueLength,
 		musicService,
 		dispatch,
 		state.progress,
@@ -1348,16 +949,10 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			isInitializedRef.current = true;
 
 			if (persistedState) {
-				if (persistedState.sessionHistory) {
-					inkSessionHistory = persistedState.sessionHistory;
-				}
-
 				logger.info('PlayerProvider', 'Restoring persisted state', {
 					hasTrack: !!persistedState.currentTrack,
 					queueLength: persistedState.queue.length,
 					progress: persistedState.progress,
-					playbackMode: persistedState.playbackMode ?? 'youtube',
-					hasStation: !!persistedState.currentStation,
 				});
 
 				// Restore all state atomically with single dispatch
@@ -1372,11 +967,6 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 					shuffle: persistedState.shuffle,
 					repeat: persistedState.repeat,
 					autoplay: persistedState.autoplay ?? true,
-					explicitQueueLength: persistedState.explicitQueueLength,
-					playbackMode: persistedState.playbackMode ?? 'youtube',
-					currentStation: persistedState.currentStation ?? null,
-					radioIsActive: persistedState.radioIsActive ?? false,
-					radioSeed: persistedState.radioSeed ?? null,
 				});
 			}
 		});
@@ -1403,12 +993,6 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 					shuffle: state.shuffle,
 					repeat: state.repeat,
 					autoplay: state.autoplay,
-					sessionHistory: inkSessionHistory,
-					explicitQueueLength: state.explicitQueueLength,
-					playbackMode: state.playbackMode,
-					currentStation: state.currentStation,
-					radioIsActive: state.radioIsActive,
-					radioSeed: state.radioSeed,
 				});
 			},
 			// Debounce progress updates (5s), immediate for track/queue changes
@@ -1429,11 +1013,6 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 		state.shuffle,
 		state.repeat,
 		state.autoplay,
-		state.explicitQueueLength,
-		state.playbackMode,
-		state.currentStation,
-		state.radioIsActive,
-		state.radioSeed,
 	]);
 
 	// Save immediately on unmount/quit
@@ -1455,12 +1034,6 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 				shuffle: currentState.shuffle,
 				repeat: currentState.repeat,
 				autoplay: currentState.autoplay,
-				sessionHistory: inkSessionHistory,
-				explicitQueueLength: currentState.explicitQueueLength,
-				playbackMode: currentState.playbackMode,
-				currentStation: currentState.currentStation,
-				radioIsActive: currentState.radioIsActive,
-				radioSeed: currentState.radioSeed,
 			});
 		};
 
@@ -1509,7 +1082,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 
 	const actions = useMemo(
 		() => ({
-			play: (track: Track) => {
+			play: (track: Track, _options?: {clearQueue?: boolean}) => {
 				logger.info('PlayerProvider', 'play() action dispatched', {
 					title: track.title,
 					videoId: track.videoId,
@@ -1542,7 +1115,6 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			toggleAutoplay: () => dispatch({category: 'TOGGLE_AUTOPLAY'}),
 			setQueue: (queue: Track[]) => dispatch({category: 'SET_QUEUE', queue}),
 			addToQueue: (track: Track) => dispatch({category: 'ADD_TO_QUEUE', track}),
-			playNext: (track: Track) => dispatch({category: 'PLAY_NEXT', track}),
 			removeFromQueue: (index: number) =>
 				dispatch({category: 'REMOVE_FROM_QUEUE', index}),
 			clearQueue: () => dispatch({category: 'CLEAR_QUEUE'}),
@@ -1558,7 +1130,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			setABLoop: (a: number | null, b: number | null) => {
 				dispatch({category: 'SET_AB_LOOP', a, b});
 			},
-			startRadio: (seed: RadioSeed) => {
+			startRadio: (seed: RadioSeed, _options?: {playNow?: boolean}) => {
 				dispatch({category: 'START_RADIO', seed});
 			},
 			stopRadio: () => {
