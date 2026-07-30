@@ -8,6 +8,7 @@ export type RepeatMode = 'off' | 'all' | 'one';
 export type DownloadFormat = 'mp3' | 'm4a';
 export type EqualizerPreset =
 	'flat' | 'bass_boost' | 'vocal' | 'bright' | 'warm';
+export type CookiesFromBrowser = 'chrome' | 'firefox' | 'edge' | 'brave';
 
 export interface KeybindingConfig {
 	keys: string[];
@@ -30,7 +31,8 @@ export interface Config {
 	playlists: Playlist[];
 	history: string[];
 	searchHistory: string[];
-	favorites: string[];
+	/** @deprecated Legacy favorites from config.json - migrated to favorites.json */
+	favorites?: string[];
 	repeat: RepeatMode;
 	shuffle: boolean;
 	customTheme?: Theme;
@@ -52,9 +54,17 @@ export interface Config {
 	};
 	discordRichPresence?: boolean;
 	proxy?: string;
+	/** Netscape cookies.txt for yt-dlp (preferred over cookiesFromBrowser). */
+	cookiesFile?: string;
+	/** Browser profile for yt-dlp --cookies-from-browser (Edge recommended on Windows). */
+	cookiesFromBrowser?: CookiesFromBrowser;
+	/** Cap for persisted listening history entries (default 2000). */
+	maxHistoryEntries?: number;
 	downloadsEnabled?: boolean;
 	downloadDirectory?: string;
 	downloadFormat?: DownloadFormat;
+	/** Prefer on-disk downloads over YouTube when a local file exists (default true). */
+	preferLocalPlayback?: boolean;
 	subtitlesEnabled?: boolean;
 	webServer?: WebServerConfig;
 	backgroundPlayback?: {
@@ -64,6 +74,7 @@ export interface Config {
 		timestamp?: string;
 	};
 	lastVersionCheck?: string;
+	logFilePath?: string;
 	llmEnabled?: boolean;
 	llm?: LLMConfig;
 	llmUsage?: LLMUsage;

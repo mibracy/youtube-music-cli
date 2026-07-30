@@ -8,6 +8,7 @@ import {WebSocketServer, WebSocket} from 'ws';
 import type {WebServerConfig} from '../../types/web.types.ts';
 import type {ServerMessage, ClientMessage} from '../../types/web.types.ts';
 import type {PlayerAction} from '../../types/player.types.ts';
+import type {Track} from '../../types/youtube-music.types.ts';
 import {getWebStreamingService} from './web-streaming.service.ts';
 import {getStaticFileService} from './static-file.service.ts';
 import {logger} from '../logger/logger.service.ts';
@@ -25,6 +26,10 @@ interface WebSocketServerOptions {
 		searchType: 'all' | 'songs' | 'artists' | 'albums' | 'playlists',
 	) => void;
 	onConfigUpdate?: (config: Record<string, unknown>) => void;
+	onLiveStreamsRequest?: () => void;
+	onRadioSearchRequest?: (query: string, countrycode?: string) => void;
+	onFavoritesRequest?: () => void;
+	onFavoritesToggle?: (track: Track) => void;
 }
 
 class WebSocketServerClass {
@@ -44,6 +49,10 @@ class WebSocketServerClass {
 		searchType: 'all' | 'songs' | 'artists' | 'albums' | 'playlists',
 	) => void;
 	private onConfigUpdate?: (config: Record<string, unknown>) => void;
+	private onLiveStreamsRequest?: () => void;
+	private onRadioSearchRequest?: (query: string, countrycode?: string) => void;
+	private onFavoritesRequest?: () => void;
+	private onFavoritesToggle?: (track: Track) => void;
 
 	constructor() {
 		this.config = {
@@ -65,6 +74,10 @@ class WebSocketServerClass {
 		this.onImportRequest = options.onImportRequest;
 		this.onSearchRequest = options.onSearchRequest;
 		this.onConfigUpdate = options.onConfigUpdate;
+		this.onLiveStreamsRequest = options.onLiveStreamsRequest;
+		this.onRadioSearchRequest = options.onRadioSearchRequest;
+		this.onFavoritesRequest = options.onFavoritesRequest;
+		this.onFavoritesToggle = options.onFavoritesToggle;
 
 		logger.info('WebSocketServer', 'Starting server', {
 			host: this.config.host,
@@ -238,6 +251,30 @@ class WebSocketServerClass {
 			case 'config-update':
 				if (this.onConfigUpdate) {
 					this.onConfigUpdate(message.config as Record<string, unknown>);
+				}
+				break;
+
+			case 'live-streams-request':
+				if (this.onLiveStreamsRequest) {
+					this.onLiveStreamsRequest();
+				}
+				break;
+
+			case 'radio-search-request':
+				if (this.onRadioSearchRequest) {
+					this.onRadioSearchRequest(message.query, message.countrycode);
+				}
+				break;
+
+			case 'favorites-request':
+				if (this.onFavoritesRequest) {
+					this.onFavoritesRequest();
+				}
+				break;
+
+			case 'favorites-toggle':
+				if (this.onFavoritesToggle) {
+					this.onFavoritesToggle(message.track);
 				}
 				break;
 

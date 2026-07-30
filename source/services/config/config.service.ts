@@ -188,6 +188,9 @@ class ConfigService {
 	}
 
 	addFavorite(trackId: string): void {
+		if (!this.config.favorites) {
+			this.config.favorites = [];
+		}
 		if (!this.config.favorites.includes(trackId)) {
 			this.config.favorites.push(trackId);
 			this.save();
@@ -195,20 +198,27 @@ class ConfigService {
 	}
 
 	removeFavorite(trackId: string): void {
+		if (!this.config.favorites) {
+			return;
+		}
 		this.config.favorites = this.config.favorites.filter(id => id !== trackId);
 		this.save();
 	}
 
 	isFavorite(trackId: string): boolean {
-		return this.config.favorites.includes(trackId);
+		return this.config.favorites?.includes(trackId) ?? false;
 	}
 
 	getFavorites(): string[] {
-		return this.config.favorites;
+		return this.config.favorites ?? [];
 	}
 
 	getLegacyFavoriteIds(): string[] {
-		return [...this.config.favorites];
+		return [...(this.config.favorites ?? [])];
+	}
+
+	getProxy(): string | undefined {
+		return this.config.proxy;
 	}
 
 	setBackgroundPlaybackState(state: {

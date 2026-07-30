@@ -22,22 +22,56 @@ jobs:
         run: bun install
       - name: Build
         run: bun run build
-      - name: Compile
-        run: bun run compile
-      - name: Compile Windows
-        run: bun build source/cli.tsx --compile --target=bun-windows-x64 --outfile dist/youtube-music-cli.exe
-      - name: Extract Latest Changelog
+      # Publish the JS/web package first — never include compiled Bun binaries
+      # in the npm tarball (they blow past registry size limits / E413).
+      - name: Check npm package contents
         run: |
-          awk '/^#+ \[?[0-9]/ { if (p) exit; p=1 } p' CHANGELOG.md > latest-release.md
+          set -euo pipefail
+          npm pack --dry-run 2>&1 | tee pack-dry-run.txt
+          if grep -E 'dist/(ymc-win32|youtube-music-cli)' pack-dry-run.txt; then
+            echo "Compiled binaries must not be included in the npm package."
+            exit 1
+          fi
+          PACKAGE_SIZE="$(awk '/package size:/ {print $4, $5}' pack-dry-run.txt | tail -1)"
+          echo "npm pack dry-run package size: ${PACKAGE_SIZE}"
       - uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.NPM_TOKEN }}
 
+      - name: Compile platform binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Native Linux (runner)
+          bun run compile
+          cp dist/youtube-music-cli dist/youtube-music-cli-linux-x64
+          # Cross-compile Windows + macOS
+          bun build source/cli.tsx --compile --target=bun-windows-x64 --outfile dist/youtube-music-cli-windows-x64.exe
+          bun build source/cli.tsx --compile --target=bun-darwin-x64 --outfile dist/youtube-music-cli-darwin-x64
+          bun build source/cli.tsx --compile --target=bun-darwin-arm64 --outfile dist/youtube-music-cli-darwin-arm64
+          # Legacy names for older install scripts / docs
+          cp dist/youtube-music-cli-windows-x64.exe dist/youtube-music-cli.exe
+      - name: Prepare release notes
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          NOTES="docs/releases/v${TAG}.md"
+          if [ -f "$NOTES" ]; then
+            cp "$NOTES" latest-release.md
+            echo "Using milestone notes: $NOTES"
+          else
+            awk '/^#+ \[?[0-9]/ { if (p) exit; p=1 } p' CHANGELOG.md > latest-release.md
+            echo "Using CHANGELOG slice"
+          fi
       - name: Release to GitHub
         uses: softprops/action-gh-release@v3
         if: github.ref_type == 'tag'
         with:
+          name: ${{ github.ref_name }}
           files: |
             dist/youtube-music-cli
+            dist/youtube-music-cli-linux-x64
             dist/youtube-music-cli.exe
+            dist/youtube-music-cli-windows-x64.exe
+            dist/youtube-music-cli-darwin-x64
+            dist/youtube-music-cli-darwin-arm64
           body_path: latest-release.md

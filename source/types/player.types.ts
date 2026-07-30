@@ -1,5 +1,10 @@
 // Player store type definitions
 import type {RadioSeed} from './radio.types.ts';
+import type {
+	PlaybackMode,
+	RadioStation,
+	StreamNowPlaying,
+} from './radio-station.types.ts';
 import type {Track} from './youtube-music.types.ts';
 import type {
 	PlayAction,
@@ -19,6 +24,7 @@ import type {
 	ToggleAutoplayAction,
 	SetQueueAction,
 	AddToQueueAction,
+	PlayNextAction,
 	RemoveFromQueueAction,
 	ClearQueueAction,
 	SetQueuePositionAction,
@@ -31,6 +37,7 @@ import type {
 	SetSpeedAction,
 	StartRadioAction,
 	StopRadioAction,
+	PlayStreamAction,
 } from './actions.ts';
 
 export interface PlayerState {
@@ -52,6 +59,12 @@ export interface PlayerState {
 	subtitle: string | null;
 	radioIsActive: boolean;
 	radioSeed: RadioSeed | null;
+	explicitQueueLength: number;
+	playbackMode: PlaybackMode;
+	currentStation: RadioStation | null;
+	streamNowPlaying: StreamNowPlaying | null;
+	/** Whether the current track is served from a local download or YouTube. */
+	mediaSource: 'local' | 'youtube' | null;
 }
 
 export type PlayerAction =
@@ -72,6 +85,7 @@ export type PlayerAction =
 	| ToggleAutoplayAction
 	| SetQueueAction
 	| AddToQueueAction
+	| PlayNextAction
 	| RemoveFromQueueAction
 	| ClearQueueAction
 	| import('./actions.ts').ClearQueueAfterCurrentAction
@@ -81,11 +95,14 @@ export type PlayerAction =
 	| TickAction
 	| SetLoadingAction
 	| SetErrorAction
+	| import('./actions.ts').SetMediaSourceAction
 	| RestoreStateAction
 	| SetSpeedAction
 	| SetSpeedAction
 	| import('./actions.ts').SetABLoopAction
 	| import('./actions.ts').SetSubtitleAction
+	| import('./actions.ts').SetStreamNowPlayingAction
 	| StartRadioAction
 	| StopRadioAction
-	| import('./actions.ts').ToggleRadioAction;
+	| import('./actions.ts').ToggleRadioAction
+	| PlayStreamAction;

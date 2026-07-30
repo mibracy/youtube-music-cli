@@ -61,6 +61,12 @@
 			"sourceType": "github",
 			"computedHash": "959ab50c5b6e640620d2e259e8388c0acaf7908a1839b8a7999a0cce2d5f83fa"
 		},
+		"bun-win32": {
+			"source": "involvex/bun-win32",
+			"sourceType": "github",
+			"skillPath": "skill/bun-win32/SKILL.md",
+			"computedHash": "e2914a40977a61dd8ff79f56af1810d23c4a8357870e477256cb130d000853e7"
+		},
 		"canvas-design": {
 			"source": "involvex/skills",
 			"sourceType": "github",

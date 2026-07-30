@@ -33,6 +33,8 @@ import NewReleasesLayout from './NewReleasesLayout.tsx';
 import GenresLayout from './GenresLayout.tsx';
 import AIChatView from '../ai/AIChatView.tsx';
 import StatsDashboard from '../stats/StatsDashboard.tsx';
+import RadioStreamsLayout from './RadioStreamsLayout.tsx';
+import LiveStreamsLayout from './LiveStreamsLayout.tsx';
 import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
 import {Box} from 'ink';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
@@ -127,6 +129,14 @@ function MainLayout() {
 		dispatch({category: 'NAVIGATE', view: VIEW.STATS});
 	}, [dispatch]);
 
+	const goToRadioStreams = useCallback(() => {
+		dispatch({category: 'NAVIGATE', view: VIEW.RADIO});
+	}, [dispatch]);
+
+	const goToLiveStreams = useCallback(() => {
+		dispatch({category: 'NAVIGATE', view: VIEW.LIVE_STREAMS});
+	}, [dispatch]);
+
 	const handleDetach = useCallback(() => {
 		// Detach mode: Exit CLI while keeping music playing
 		const player = getPlayerService();
@@ -175,7 +185,10 @@ function MainLayout() {
 
 	// Global keyboard bindings
 	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, handleAddToQueue);
-	useKeyBinding(KEYBINDINGS.SEARCH, goToSearch);
+	useKeyBinding(
+		navState.currentView === VIEW.RADIO ? [] : KEYBINDINGS.SEARCH,
+		goToSearch,
+	);
 	useKeyBinding(KEYBINDINGS.PLAYLISTS, goToPlaylists);
 	useKeyBinding(KEYBINDINGS.PLUGINS, goToPlugins);
 	useKeyBinding(KEYBINDINGS.SUGGESTIONS, goToSuggestions);
@@ -191,6 +204,8 @@ function MainLayout() {
 	useKeyBinding(KEYBINDINGS.NEW_RELEASES, goToNewReleases);
 	useKeyBinding(KEYBINDINGS.GENRES, goToGenres);
 	useKeyBinding(KEYBINDINGS.STATS_VIEW, goToStats);
+	useKeyBinding(KEYBINDINGS.RADIO_STREAMS, goToRadioStreams);
+	useKeyBinding(KEYBINDINGS.LIVE_STREAMS, goToLiveStreams);
 	useKeyBinding(KEYBINDINGS.DETACH, handleDetach);
 	useKeyBinding(KEYBINDINGS.RESUME_BACKGROUND, handleResumeBackground);
 
@@ -289,6 +304,12 @@ function MainLayout() {
 
 			case 'stats':
 				return <StatsDashboard key="stats" />;
+
+			case 'radio':
+				return <RadioStreamsLayout key="radio" />;
+
+			case 'live_streams':
+				return <LiveStreamsLayout key="live_streams" />;
 
 			default:
 				return <PlayerLayout key="player-default" />;

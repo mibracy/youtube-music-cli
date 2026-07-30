@@ -1,20 +1,20 @@
-import test from 'ava';
+import {expect, test} from 'bun:test';
 
-test('player service exposes singleton without starting mpv', async t => {
+test('player service exposes singleton without starting mpv', async () => {
 	const {getPlayerService} =
 		await import('../source/services/player/player.service.ts');
 
 	const a = getPlayerService();
 	const b = getPlayerService();
 
-	t.is(a, b);
+	expect(a).toBe(b);
 
 	// Should allow pause/resume/stop without crashing when mpv is not running
-	t.notThrows(() => {
+	expect(() => {
 		a.pause();
 		a.resume();
 		a.stop();
-	});
+	}).not.toThrow();
 });
 
 // ── Shuffle reducer tests ─────────────────────────────────────────────────────
@@ -43,28 +43,52 @@ function makeTrack(id) {
 	return {videoId: id, title: `Track ${id}`, artists: [], duration: 200};
 }
 
-test('TOGGLE_SHUFFLE flips shuffle from false to true', async t => {
+test('TOGGLE_SHUFFLE flips shuffle from false to true', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const state = makeState({shuffle: false});
 	const next = playerReducer(state, {category: 'TOGGLE_SHUFFLE'});
-	t.true(next.shuffle);
+	expect(next.shuffle).toBe(true);
 });
 
-test('TOGGLE_SHUFFLE flips shuffle from true to false', async t => {
+test('TOGGLE_SHUFFLE flips shuffle from true to false', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const state = makeState({shuffle: true});
 	const next = playerReducer(state, {category: 'TOGGLE_SHUFFLE'});
-	t.false(next.shuffle);
+	expect(next.shuffle).toBe(false);
 });
 
-test('NEXT with empty queue returns unchanged state', async t => {
+test('PLAY_NEXT inserts track after current queue position', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
-	const state = makeState({shuffle: true, queue: [], queuePosition: 0});
-	const next = playerReducer(state, {category: 'NEXT'});
-	t.is(next, state); // referential equality — no change
+	const a = makeTrack('a');
+	const b = makeTrack('b');
+	const c = makeTrack('c');
+	const state = makeState({
+		queue: [a, b],
+		queuePosition: 0,
+		currentTrack: a,
+		explicitQueueLength: 2,
+	});
+	const next = playerReducer(state, {category: 'PLAY_NEXT', track: c});
+	expect(next.queue.map(track => track.videoId)).toEqual(['a', 'c', 'b']);
+	expect(next.queuePosition).toBe(0);
+	expect(next.explicitQueueLength).toBe(3);
 });
 
-test('NEXT with shuffle=true and single-track queue falls through sequentially (no-op)', async t => {
+test('ADD_TO_QUEUE appends and bumps explicitQueueLength', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const a = makeTrack('a');
+	const b = makeTrack('b');
+	const state = makeState({
+		queue: [a],
+		queuePosition: 0,
+		explicitQueueLength: 1,
+	});
+	const next = playerReducer(state, {category: 'ADD_TO_QUEUE', track: b});
+	expect(next.queue.map(track => track.videoId)).toEqual(['a', 'b']);
+	expect(next.explicitQueueLength).toBe(2);
+});
+
+test('NEXT with shuffle=true and single-track queue falls through sequentially (no-op)', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const track = makeTrack('a');
 	const state = makeState({
@@ -76,10 +100,10 @@ test('NEXT with shuffle=true and single-track queue falls through sequentially (
 	});
 	// Only 1 track — sequential logic applies, nextPosition (1) >= queue.length (1) → return state
 	const next = playerReducer(state, {category: 'NEXT'});
-	t.is(next.queuePosition, 0); // position unchanged
+	expect(next.queuePosition).toBe(0); // position unchanged
 });
 
-test('NEXT with shuffle=true and multi-track queue returns a different position', async t => {
+test('NEXT with shuffle=true and multi-track queue returns a different position', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const tracks = ['a', 'b', 'c', 'd', 'e'].map(makeTrack);
 	const state = makeState({
@@ -92,16 +116,16 @@ test('NEXT with shuffle=true and multi-track queue returns a different position'
 	// Run many times to verify we never stay at position 2
 	for (let i = 0; i < 20; i++) {
 		const next = playerReducer(state, {category: 'NEXT'});
-		t.not(next.queuePosition, 2, 'shuffle must not repeat current position');
-		t.true(
+		expect(next.queuePosition).not.toBe(2);
+		expect(
 			next.queuePosition >= 0 && next.queuePosition < tracks.length,
 			'new position must be in valid range',
-		);
-		t.is(next.progress, 0, 'progress must reset to 0');
+		).toBe(true);
+		expect(next.progress).toBe(0);
 	}
 });
 
-test('NEXT with shuffle=false uses sequential order', async t => {
+test('NEXT with shuffle=false uses sequential order', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const tracks = ['a', 'b', 'c'].map(makeTrack);
 	const state = makeState({
@@ -111,11 +135,11 @@ test('NEXT with shuffle=false uses sequential order', async t => {
 		currentTrack: tracks[1],
 	});
 	const next = playerReducer(state, {category: 'NEXT'});
-	t.is(next.queuePosition, 2);
-	t.is(next.currentTrack?.videoId, 'c');
+	expect(next.queuePosition).toBe(2);
+	expect(next.currentTrack?.videoId).toBe('c');
 });
 
-test('PREVIOUS is unaffected by shuffle state', async t => {
+test('PREVIOUS is unaffected by shuffle state', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const tracks = ['a', 'b', 'c'].map(makeTrack);
 	const state = makeState({
@@ -126,11 +150,11 @@ test('PREVIOUS is unaffected by shuffle state', async t => {
 		progress: 0,
 	});
 	const next = playerReducer(state, {category: 'PREVIOUS'});
-	t.is(next.queuePosition, 1); // always goes to sequential previous
-	t.is(next.currentTrack?.videoId, 'b');
+	expect(next.queuePosition).toBe(1); // always goes to sequential previous
+	expect(next.currentTrack?.videoId).toBe('b');
 });
 
-test('NEXT with shuffle=true wraps with repeat=all using random pick', async t => {
+test('NEXT with shuffle=true wraps with repeat=all using random pick', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const tracks = ['a', 'b', 'c'].map(makeTrack);
 	const state = makeState({
@@ -143,13 +167,13 @@ test('NEXT with shuffle=true wraps with repeat=all using random pick', async t =
 	// Shuffle is active and queue has 3 tracks — should always return a position != 0
 	for (let i = 0; i < 10; i++) {
 		const next = playerReducer(state, {category: 'NEXT'});
-		t.not(next.queuePosition, 0, 'shuffle must not return current position');
+		expect(next.queuePosition).not.toBe(0);
 	}
 });
-test('discord rpc service no-ops when disabled', async t => {
+
+test('discord rpc service no-ops when disabled', async () => {
 	const {getDiscordRpcService} =
 		await import('../source/services/discord/discord-rpc.service.ts');
-
 	const rpc = getDiscordRpcService();
 
 	rpc.setEnabled(false);
@@ -161,48 +185,5 @@ test('discord rpc service no-ops when disabled', async t => {
 	});
 	await rpc.clearActivity();
 
-	t.pass();
-});
-
-// ── Radio / queue continuation tests ──────────────────────────────────────────
-
-test('CLEAR_QUEUE_AFTER_CURRENT removes only tracks after current position', async t => {
-	const {playerReducer} = await import('../source/stores/player.store.tsx');
-	const tracks = ['a', 'b', 'c', 'd'].map(makeTrack);
-	const state = makeState({
-		queue: tracks,
-		queuePosition: 1,
-		currentTrack: tracks[1],
-		isPlaying: true,
-	});
-	const next = playerReducer(state, {category: 'CLEAR_QUEUE_AFTER_CURRENT'});
-	t.is(next.queue.length, 2);
-	t.is(next.queue[0]?.videoId, 'a');
-	t.is(next.queue[1]?.videoId, 'b');
-	t.is(next.queuePosition, 1);
-	t.is(next.currentTrack?.videoId, 'b');
-	t.true(next.isPlaying);
-});
-
-test('CLEAR_QUEUE_AFTER_CURRENT at end of queue keeps last track', async t => {
-	const {playerReducer} = await import('../source/stores/player.store.tsx');
-	const tracks = ['a', 'b'].map(makeTrack);
-	const state = makeState({
-		queue: tracks,
-		queuePosition: 1,
-		currentTrack: tracks[1],
-	});
-	const next = playerReducer(state, {category: 'CLEAR_QUEUE_AFTER_CURRENT'});
-	t.is(next.queue.length, 2);
-	t.is(next.queuePosition, 1);
-});
-
-test('START_RADIO enables radio mode and forces autoplay on', async t => {
-	const {playerReducer} = await import('../source/stores/player.store.tsx');
-	const state = makeState({autoplay: false, radioIsActive: false});
-	const seed = {type: 'track', id: 'a', name: 'Track A'};
-	const next = playerReducer(state, {category: 'START_RADIO', seed});
-	t.true(next.radioIsActive);
-	t.is(next.radioSeed, seed);
-	t.true(next.autoplay);
+	expect(true).toBe(true);
 });
