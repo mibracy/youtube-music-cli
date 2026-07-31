@@ -1,9 +1,9 @@
-import {useState, useCallback} from 'react';
+import {useState, useCallback, useEffect} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useKeyBinding, setHighlightedTrack} from '../../hooks/useKeyboard.tsx';
 import {ICONS} from '../../utils/icons.ts';
 import {truncate} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
@@ -15,6 +15,15 @@ export default function FavoritesList() {
 	const {play, dispatch: playerDispatch} = usePlayer();
 	const {columns, rows} = useTerminalSize();
 	const [selectedIndex, setSelectedIndex] = useState(0);
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		setHighlightedTrack(favorites[selectedIndex] ?? null);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [favorites, selectedIndex]);
 
 	// Navigation
 	const navigateUp = useCallback(() => {

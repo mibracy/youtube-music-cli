@@ -1,6 +1,9 @@
 // Trending tracks view — shows YouTube trending music
 import {Box, Text, useInput} from 'ink';
-import {throttleArrowKey} from '../../hooks/useKeyboard.tsx';
+import {
+	throttleArrowKey,
+	setHighlightedTrack,
+} from '../../hooks/useKeyboard.tsx';
 import {useState, useEffect} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
@@ -39,6 +42,15 @@ export default function TrendingLayout() {
 			cancelled = true;
 		};
 	}, []);
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		setHighlightedTrack(tracks[selectedIndex] ?? null);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [tracks, selectedIndex]);
 
 	useInput((input, key) => {
 		if (key.escape) {

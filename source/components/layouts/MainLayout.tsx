@@ -8,6 +8,7 @@ import {useTheme} from '../../hooks/useTheme.ts';
 import {
 	useKeyBinding,
 	registerGoHomeCallback,
+	registerDetachCallback,
 	setCurrentViewForCtrlC,
 	KeyboardManager,
 } from '../../hooks/useKeyboard.tsx';
@@ -45,7 +46,7 @@ import {usePlayer} from '../../hooks/usePlayer.ts';
 function MainLayout() {
 	const {theme} = useTheme();
 	const {state: navState, dispatch} = useNavigation();
-	const {resume, addToQueue, state: playerState} = usePlayer();
+	const {resume} = usePlayer();
 	const {columns, rows} = useTerminalSize();
 
 	// Responsive padding based on terminal size
@@ -177,14 +178,7 @@ function MainLayout() {
 		dispatch({category: 'TOGGLE_PLAYER_MODE'});
 	}, [dispatch]);
 
-	const handleAddToQueue = useCallback(() => {
-		if (playerState.currentTrack) {
-			addToQueue(playerState.currentTrack);
-		}
-	}, [addToQueue, playerState.currentTrack]);
-
 	// Global keyboard bindings
-	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, handleAddToQueue);
 	useKeyBinding(
 		navState.currentView === VIEW.RADIO ? [] : KEYBINDINGS.SEARCH,
 		goToSearch,
@@ -206,17 +200,18 @@ function MainLayout() {
 	useKeyBinding(KEYBINDINGS.STATS_VIEW, goToStats);
 	useKeyBinding(KEYBINDINGS.RADIO_STREAMS, goToRadioStreams);
 	useKeyBinding(KEYBINDINGS.LIVE_STREAMS, goToLiveStreams);
-	useKeyBinding(KEYBINDINGS.DETACH, handleDetach);
 	useKeyBinding(KEYBINDINGS.RESUME_BACKGROUND, handleResumeBackground);
 
 	// Register goHome callback for Ctrl+C handling in search view
 	useEffect(() => {
 		registerGoHomeCallback(goToHome);
+		registerDetachCallback(handleDetach);
 
 		return () => {
 			registerGoHomeCallback(() => {});
+			registerDetachCallback(() => {});
 		};
-	}, [goToHome]);
+	}, [goToHome, handleDetach]);
 
 	// Update current view for Ctrl+C handling when navigation changes
 	useEffect(() => {

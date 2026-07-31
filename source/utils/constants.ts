@@ -97,7 +97,7 @@ export const KEYBINDINGS = {
 	HISTORY: ['shift+h'],
 	SETTINGS: [','],
 	PLUGINS: ['p'],
-	DETACH: ['shift+q'],
+	DETACH: [],
 	RESUME_BACKGROUND: ['shift+r'],
 	AI_CHAT: ['a'],
 	AI_RECOMMENDATIONS: ['shift+a'],

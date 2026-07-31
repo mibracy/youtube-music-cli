@@ -31,10 +31,6 @@ export function getTerminalInfo(): TerminalInfo {
 	};
 }
 
-export function onTerminalResize(handler: () => void): void {
-	process.stdout.on('resize', handler);
-}
-
 export function setConsoleTitle(title: string): void {
 	void setNativeConsoleTitle(title).then(success => {
 		if (!success) {

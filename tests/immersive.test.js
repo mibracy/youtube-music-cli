@@ -132,6 +132,7 @@ test('queue-state supports shuffle and repeat-all', async t => {
 
 	state.shuffle = false;
 	state.repeat = 'all';
+	state.autoplay = false;
 	state.queueIndex = 2;
 	state.currentTrack = state.queue[2] ?? null;
 	t.is(advanceQueue(state)?.videoId, 'a');
@@ -149,6 +150,7 @@ test('queue-state shuffle with repeat-all at end picks a different track', async
 	]);
 	state.queueIndex = 2;
 	state.currentTrack = state.queue[2] ?? null;
+	state.autoplay = false;
 
 	const next = advanceQueue(state);
 	t.truthy(next);
@@ -219,14 +221,14 @@ test('settings overlay navigates and cycles rows', async t => {
 	const overlay = createSettingsOverlayState();
 	openSettingsOverlay(overlay);
 	t.true(overlay.active);
-	t.is(SETTINGS_ROW_COUNT, 23);
+	t.is(SETTINGS_ROW_COUNT, 26);
 
 	t.is(handleSettingsInput(overlay, 'down', SETTINGS_ROW_COUNT), 'none');
 	t.is(overlay.selectedIndex, 1);
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'cycle');
 	overlay.selectedIndex = 10;
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'begin_text');
-	overlay.selectedIndex = 19;
+	overlay.selectedIndex = 22;
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'navigate');
 	t.is(handleSettingsInput(overlay, 'escape', SETTINGS_ROW_COUNT), 'close');
 	t.false(overlay.active);
@@ -247,10 +249,10 @@ test('immersive settings items match TUI row count and cycle values', async t =>
 	const sleepTimer = createSleepTimerState();
 	const rows = buildImmersiveSettingsRows(config);
 
-	t.is(rows.length, 23);
+	t.is(rows.length, 26);
 	t.true(rows[0]?.label.includes('Stream Quality'));
-	t.true(rows[18]?.label.includes('Sleep Timer'));
-	t.true(rows[22]?.label.includes('Manage Plugins'));
+	t.true(rows[21]?.label.includes('Sleep Timer'));
+	t.true(rows[25]?.label.includes('Manage Plugins'));
 
 	const message = cycleImmersiveSetting(config, 6, {
 		sleepTimer,

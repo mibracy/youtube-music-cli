@@ -47,8 +47,6 @@ export default function PlayerControls() {
 		resume,
 		next,
 		previous,
-		volumeUp,
-		volumeDown,
 		speedUp,
 		speedDown,
 		toggleShuffle,
@@ -116,8 +114,6 @@ export default function PlayerControls() {
 	useKeyBinding(KEYBINDINGS.PLAY_PAUSE, handlePlayPause);
 	useKeyBinding(KEYBINDINGS.NEXT, next);
 	useKeyBinding(KEYBINDINGS.PREVIOUS, previous);
-	useKeyBinding(['up'], volumeUp);
-	useKeyBinding(['down'], volumeDown);
 	useKeyBinding(KEYBINDINGS.SPEED_UP, speedUp);
 	useKeyBinding(KEYBINDINGS.SPEED_DOWN, speedDown);
 	useKeyBinding(KEYBINDINGS.SHUFFLE, toggleShuffle);

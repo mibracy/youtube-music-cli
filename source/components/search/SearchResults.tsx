@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import type {SearchResult, Track} from '../../types/youtube-music.types.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useKeyBinding, setHighlightedTrack} from '../../hooks/useKeyboard.tsx';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {usePlaylist} from '../../hooks/usePlaylist.ts';
@@ -57,6 +57,17 @@ function SearchResults({
 	const instanceIdRef = useRef(++instanceCounter);
 	const lastSelectTime = useRef<number>(0);
 	const SELECT_DEBOUNCE_MS = 300; // Prevent duplicate triggers within 300ms
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		const selected = results[selectedIndex];
+		const track = selected?.type === 'song' ? (selected.data as Track) : null;
+		setHighlightedTrack(track);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [results, selectedIndex]);
 
 	useEffect(() => {
 		const instanceId = instanceIdRef.current;

@@ -14,7 +14,6 @@ import {
 	enterAltBuffer,
 	exitAltBuffer,
 	enableDpiAwareness,
-	onTerminalResize,
 } from './native/console.ts';
 import {
 	createTrayIcon,
@@ -155,7 +154,6 @@ export class ImmersiveEngine {
 	private inputHandler: ((data: string) => void) | null = null;
 	private stdinKeyBuffer: StdinKeyBuffer | null = null;
 	private exitHandler: (() => void) | null = null;
-	private resizeHandler: (() => void) | null = null;
 	private listenersRemoved = false;
 
 	constructor(options: ImmersiveOptions) {
@@ -268,7 +266,6 @@ export class ImmersiveEngine {
 		}
 
 		this.setupInput();
-		this.setupResize(fb);
 
 		loop.start(deltaTime => {
 			if (!fb || !canvas || !audio || !disco || !particles || !hybrid) return;
@@ -413,25 +410,6 @@ export class ImmersiveEngine {
 		}
 
 		return null;
-	}
-
-	private setupResize(fb: FrameBuffer): void {
-		this.resizeHandler = () => {
-			const {width, height} = getTerminalInfo();
-			this.effectiveWidth = width;
-			this.effectiveHeight = height;
-			fb.width = width;
-			fb.height = height;
-			fb.cells = Array.from({length: height}, () =>
-				Array.from({length: width}, () => ({
-					char: ' ',
-					fg: null,
-					bg: null,
-				})),
-			);
-			this.canvas?.resize(width, height);
-		};
-		onTerminalResize(this.resizeHandler);
 	}
 
 	private setupInput(): void {
@@ -826,11 +804,6 @@ export class ImmersiveEngine {
 
 			this.stdinKeyBuffer?.dispose();
 			this.stdinKeyBuffer = null;
-
-			if (this.resizeHandler) {
-				process.stdout.off('resize', this.resizeHandler);
-				this.resizeHandler = null;
-			}
 
 			showCursor();
 			exitAltBuffer();

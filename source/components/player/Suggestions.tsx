@@ -4,7 +4,7 @@ import {Box, Text} from 'ink';
 import {useYouTubeMusic} from '../../hooks/useYouTubeMusic.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useKeyBinding, setHighlightedTrack} from '../../hooks/useKeyboard.tsx';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import type {Track} from '../../types/youtube-music.types.ts';
@@ -26,6 +26,15 @@ export default function Suggestions() {
 			});
 		}
 	}, [playerState.currentTrack?.videoId, getSuggestions]);
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		setHighlightedTrack(suggestions[selectedIndex] ?? null);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [suggestions, selectedIndex]);
 
 	const navigateUp = useCallback(() => {
 		setSelectedIndex(prev => Math.max(0, prev - 1));

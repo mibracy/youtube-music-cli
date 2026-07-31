@@ -1,6 +1,9 @@
 // Explore / Genre browsing view — shows curated sections from YouTube Music
 import {Box, Text, useInput} from 'ink';
-import {throttleArrowKey} from '../../hooks/useKeyboard.tsx';
+import {
+	throttleArrowKey,
+	setHighlightedTrack,
+} from '../../hooks/useKeyboard.tsx';
 import {useState, useEffect} from 'react';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
@@ -45,6 +48,16 @@ export default function ExploreLayout() {
 			cancelled = true;
 		};
 	}, []);
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		const currentSection = sections[sectionIndex];
+		setHighlightedTrack(currentSection?.tracks[trackIndex] ?? null);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [sections, sectionIndex, trackIndex]);
 
 	const currentSection = sections[sectionIndex];
 	const tracks = currentSection?.tracks ?? [];

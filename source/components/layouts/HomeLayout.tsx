@@ -11,6 +11,7 @@ import {
 	useKeyBinding,
 	subscribeToQuitSequence,
 	getQuitSequence,
+	setHighlightedTrack,
 } from '../../hooks/useKeyboard.tsx';
 import {truncate, formatTime} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
@@ -97,6 +98,7 @@ export default function HomeLayout() {
 		{label: '📡 Live Streams', view: VIEW.LIVE_STREAMS},
 		{label: '💘 Favorites', view: VIEW.FAVORITES},
 		{label: '🕒 History', view: VIEW.HISTORY},
+		{label: '🎵 Queue', view: VIEW.PLAYER},
 		{label: '🎲 Random Song', action: handlePlayRandom},
 		{label: '🎲 Random Favorite', action: handlePlayRandomFavorite},
 	];
@@ -136,6 +138,22 @@ export default function HomeLayout() {
 				return 0;
 		}
 	};
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		const idx = tabIndices[activeTab];
+		const track =
+			activeTab === 'recentlyplayed'
+				? (recentHistory[idx]?.track ?? null)
+				: activeTab === 'favorites'
+					? (recentFavorites[idx] ?? null)
+					: null;
+		setHighlightedTrack(track);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [activeTab, tabIndices, recentHistory, recentFavorites]);
 
 	const cycleTab = useCallback((direction: 1 | -1) => {
 		setActiveTab(prev => {
@@ -508,6 +526,17 @@ export default function HomeLayout() {
 						>
 							q
 						</Text>
+						{/* <Text> • Detach </Text>
+						<Text
+							color={quitState >= 1 ? theme.colors.success : theme.colors.dim}
+						>
+							:
+						</Text>
+						<Text
+							color={quitState >= 3 ? theme.colors.success : theme.colors.dim}
+						>
+							d
+						</Text> */}
 					</Text>
 				</Box>
 				{rows >= 25 && columns >= 130 && (

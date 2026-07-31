@@ -3,7 +3,7 @@ import {useState, useEffect} from 'react';
 import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useKeyBinding, getHighlightedTrack} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {ICONS} from '../../utils/icons.ts';
 import {logger} from '../../services/logger/logger.service.ts';
@@ -29,6 +29,7 @@ export default function ShortcutsBar() {
 		toggleAutoplay,
 		startRadio,
 		stopRadio,
+		addToQueue,
 	} = usePlayer();
 
 	const [flashState, setFlashState] = useState<Record<string, boolean>>({});
@@ -120,6 +121,13 @@ export default function ShortcutsBar() {
 			);
 		}
 	});
+	useKeyBinding(KEYBINDINGS.ADD_TO_QUEUE, () => {
+		flash('queue');
+		const track = getHighlightedTrack();
+		if (track) {
+			addToQueue(track);
+		}
+	});
 	// Note: SETTINGS keybinding handled by MainLayout to avoid double-dispatch
 
 	const shuffleColor = flashState['shuffle']
@@ -187,6 +195,7 @@ export default function ShortcutsBar() {
 							</Text>{' '}
 							• <Text color={navAutoplayColor}>{ICONS.AUTOPLAY} [Sft+A]</Text> •{' '}
 							<Text color={theme.colors.dim}>{ICONS.RADIO} [Sft+X]</Text> •{' '}
+							<Text color={shortcutColor('queue')}>{ICONS.PLAYLIST} [Q]</Text> •{' '}
 							<Text color={theme.colors.text}>{ICONS.HELP} [?]</Text>
 						</Text>
 					)}

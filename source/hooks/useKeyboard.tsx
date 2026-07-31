@@ -3,6 +3,7 @@ import {useEffect, useRef} from 'react';
 import {useInput} from 'ink';
 import {logger} from '../services/logger/logger.service.ts';
 import {getPlayerService} from '../services/player/player.service.ts';
+import type {Track} from '../types/youtube-music.types.ts';
 import {useKeyboardBlockContext} from './useKeyboardBlocker.tsx';
 
 type KeyHandler = () => void;
@@ -32,6 +33,16 @@ let goHomeCallback: (() => void) | null = null;
  */
 export function registerGoHomeCallback(callback: () => void): void {
 	goHomeCallback = callback;
+}
+
+// Callback to detach (background playback), triggered by :d (registered by MainLayout)
+let detachCallback: (() => void) | null = null;
+
+/**
+ * Register a callback to detach into background playback (used for :d)
+ */
+export function registerDetachCallback(callback: () => void): void {
+	detachCallback = callback;
 }
 
 /**
@@ -94,7 +105,7 @@ export function useKeyBinding(
  * This should be rendered once at the root of the app.
  */
 // :q quit sequence state
-let quitSequence = 0; // 0=idle, 1=colon pressed, 2=q pressed after colon
+let quitSequence = 0; // 0=idle, 1=colon pressed, 2=q pressed after colon, 3=d pressed after colon
 const quitSequenceListeners: Set<(state: number) => void> = new Set();
 
 export function subscribeToQuitSequence(
@@ -108,6 +119,17 @@ export function subscribeToQuitSequence(
 
 export function getQuitSequence(): number {
 	return quitSequence;
+}
+
+// Currently highlighted track, registered by list views for "add to queue" ('q')
+let highlightedTrack: Track | null = null;
+
+export function setHighlightedTrack(track: Track | null): void {
+	highlightedTrack = track;
+}
+
+export function getHighlightedTrack(): Track | null {
+	return highlightedTrack;
 }
 
 // Search type cycle signal
@@ -176,25 +198,40 @@ export function KeyboardManager() {
 			return;
 		}
 
-		// :q quit sequence
-		if (quitSequence === 0 && input === ':' && !key.ctrl && !key.meta) {
-			setQuitSequence(1);
-			return;
-		}
-
-		if (quitSequence === 1) {
-			if (input === 'q' && !key.ctrl && !key.meta) {
-				setQuitSequence(2);
+		// :q quit / :d detach sequences (only when input is not blocked, e.g. text inputs)
+		if (blockCount === 0) {
+			if (quitSequence === 0 && input === ':' && !key.ctrl && !key.meta) {
+				setQuitSequence(1);
 				return;
 			}
 
-			setQuitSequence(0);
-		} else if (quitSequence === 2) {
-			if (key.return) {
-				process.exit(0);
-			}
+			if (quitSequence === 1) {
+				if (input === 'q' && !key.ctrl && !key.meta) {
+					setQuitSequence(2);
+					return;
+				}
 
-			setQuitSequence(0);
+				if (input === 'd' && !key.ctrl && !key.meta) {
+					setQuitSequence(3);
+					return;
+				}
+
+				setQuitSequence(0);
+			} else if (quitSequence === 2) {
+				if (key.return) {
+					process.exit(0);
+				}
+
+				setQuitSequence(0);
+			} else if (quitSequence === 3) {
+				if (key.return) {
+					if (detachCallback) {
+						detachCallback();
+					}
+				}
+
+				setQuitSequence(0);
+			}
 		}
 
 		if (blockCount > 0) {

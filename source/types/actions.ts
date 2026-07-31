@@ -87,8 +87,18 @@ export interface RemoveFromQueueAction {
 	index: number;
 }
 
+export interface MoveInQueueAction {
+	readonly category: 'MOVE_IN_QUEUE';
+	from: number;
+	to: number;
+}
+
 export interface ClearQueueAction {
 	readonly category: 'CLEAR_QUEUE';
+}
+
+export interface ClearQueueKeepCurrentAction {
+	readonly category: 'CLEAR_QUEUE_KEEP_CURRENT';
 }
 
 export interface ClearQueueAfterCurrentAction {

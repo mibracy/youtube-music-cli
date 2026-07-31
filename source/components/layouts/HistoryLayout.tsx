@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useHistory} from '../../stores/history.store.tsx';
@@ -6,7 +6,7 @@ import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 import {truncate} from '../../utils/format.ts';
-import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
+import {useKeyBinding, setHighlightedTrack} from '../../hooks/useKeyboard.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {useNavigation} from '../../hooks/useNavigation.ts';
 
@@ -40,6 +40,15 @@ export default function HistoryLayout() {
 	const visibleHistory = history.slice(scrollOffset, scrollOffset + maxVisible);
 	const canScrollUp = scrollOffset > 0;
 	const canScrollDown = scrollOffset + maxVisible < history.length;
+
+	// Register the highlighted track for "add to queue" ('q')
+	useEffect(() => {
+		setHighlightedTrack(visibleHistory[selectedIndex]?.track ?? null);
+
+		return () => {
+			setHighlightedTrack(null);
+		};
+	}, [visibleHistory, selectedIndex]);
 
 	useKeyBinding(KEYBINDINGS.BACK, () => {
 		dispatch({category: 'GO_BACK'});

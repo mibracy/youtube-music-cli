@@ -242,7 +242,49 @@ export function playerReducer(
 		case 'REMOVE_FROM_QUEUE': {
 			const newQueue = [...state.queue];
 			newQueue.splice(action.index, 1);
-			return {...state, queue: newQueue};
+
+			// Keep the same track current when items before it are removed.
+			let queuePosition = state.queuePosition;
+			if (action.index < state.queuePosition) {
+				queuePosition--;
+			} else if (action.index === state.queuePosition) {
+				queuePosition = Math.max(
+					0,
+					Math.min(state.queuePosition, newQueue.length - 1),
+				);
+			}
+
+			return {...state, queue: newQueue, queuePosition};
+		}
+
+		case 'MOVE_IN_QUEUE': {
+			const {from, to} = action;
+			const newQueue = [...state.queue];
+			if (
+				from < 0 ||
+				from >= newQueue.length ||
+				to < 0 ||
+				to >= newQueue.length ||
+				from === to
+			) {
+				return state;
+			}
+
+			const moved = newQueue[from]!;
+			newQueue.splice(from, 1);
+			newQueue.splice(to, 0, moved);
+
+			// Keep the same track current when reordering around it.
+			let queuePosition = state.queuePosition;
+			if (from === state.queuePosition) {
+				queuePosition = to;
+			} else if (from < state.queuePosition && to >= state.queuePosition) {
+				queuePosition--;
+			} else if (from > state.queuePosition && to <= state.queuePosition) {
+				queuePosition++;
+			}
+
+			return {...state, queue: newQueue, queuePosition};
 		}
 
 		case 'CLEAR_QUEUE':
@@ -251,6 +293,13 @@ export function playerReducer(
 				queue: [],
 				queuePosition: 0,
 				isPlaying: false,
+			};
+
+		case 'CLEAR_QUEUE_KEEP_CURRENT':
+			return {
+				...state,
+				queue: [],
+				queuePosition: 0,
 			};
 
 		case 'CLEAR_QUEUE_AFTER_CURRENT': {
@@ -407,7 +456,9 @@ type PlayerContextValue = {
 	setQueue: (queue: Track[]) => void;
 	addToQueue: (track: Track) => void;
 	removeFromQueue: (index: number) => void;
+	moveInQueue: (from: number, to: number) => void;
 	clearQueue: () => void;
+	clearQueueKeepCurrent: () => void;
 	setQueuePosition: (position: number) => void;
 	setSpeed: (speed: number) => void;
 	speedUp: () => void;
@@ -1177,7 +1228,11 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			addToQueue: (track: Track) => dispatch({category: 'ADD_TO_QUEUE', track}),
 			removeFromQueue: (index: number) =>
 				dispatch({category: 'REMOVE_FROM_QUEUE', index}),
+			moveInQueue: (from: number, to: number) =>
+				dispatch({category: 'MOVE_IN_QUEUE', from, to}),
 			clearQueue: () => dispatch({category: 'CLEAR_QUEUE'}),
+			clearQueueKeepCurrent: () =>
+				dispatch({category: 'CLEAR_QUEUE_KEEP_CURRENT'}),
 			setQueuePosition: (position: number) =>
 				dispatch({category: 'SET_QUEUE_POSITION', position}),
 			setSpeed: (speed: number) => dispatch({category: 'SET_SPEED', speed}),

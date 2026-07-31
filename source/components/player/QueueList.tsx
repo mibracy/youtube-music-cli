@@ -5,16 +5,25 @@ import {Box, Text} from 'ink';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useFavorites} from '../../stores/favorites.store.tsx';
+import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {ICONS} from '../../utils/icons.ts';
 import {truncate} from '../../utils/format.ts';
 import {useTerminalSize} from '../../hooks/useTerminalSize.ts';
 
+const MAX_VISIBLE = 5;
+
 function QueueList() {
 	const {theme} = useTheme();
-	const {state: playerState} = usePlayer();
+	const {
+		state: playerState,
+		removeFromQueue,
+		moveInQueue,
+		clearQueueKeepCurrent,
+	} = usePlayer();
 	const {isFavorite} = useFavorites();
 	const {columns} = useTerminalSize();
-	const [selectedIndex, _setSelectedIndex] = useState(0);
+	const [scrollOffset, setScrollOffset] = useState(0);
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
 	// Calculate responsive truncation
 	const getTruncateLength = (baseLength: number) => {
@@ -22,15 +31,86 @@ function QueueList() {
 		return Math.max(20, Math.floor(baseLength * scale));
 	};
 
+	// When the playing track isn't part of the queue (standalone play),
+	// show queued tracks from the start instead of after the queue position,
+	// so tracks added with 'q' are visible.
+	const currentTrackId = playerState.currentTrack?.videoId;
+	const currentInQueue = playerState.queue.some(
+		track => track.videoId === currentTrackId,
+	);
+	const startIndex = currentInQueue
+		? playerState.queuePosition + 1
+		: playerState.queuePosition;
+
+	// Clamp scroll/selection at render time so stale state is never used
+	// after the queue shrinks or the current track advances.
+	const maxScroll = Math.max(
+		0,
+		playerState.queue.length - startIndex - MAX_VISIBLE,
+	);
+	const scroll = Math.min(scrollOffset, maxScroll);
+	const visibleQueue = playerState.queue.slice(
+		startIndex + scroll,
+		startIndex + scroll + MAX_VISIBLE,
+	);
+	const hasMoreUp = scroll > 0;
+	const hasMoreDown =
+		startIndex + scroll + MAX_VISIBLE < playerState.queue.length;
+	const selected = Math.min(selectedIndex, visibleQueue.length - 1);
+	const selectedAbs = startIndex + scroll + selected;
+
+	const navigateUp = () => {
+		if (selected > 0) {
+			setSelectedIndex(i => i - 1);
+		} else if (scroll > 0) {
+			setScrollOffset(offset => offset - 1);
+		}
+	};
+
+	const navigateDown = () => {
+		if (selected < visibleQueue.length - 1) {
+			setSelectedIndex(i => i + 1);
+		} else if (hasMoreDown) {
+			setScrollOffset(offset => offset + 1);
+		}
+	};
+
+	const removeSelected = () => {
+		if (selectedAbs >= 0 && selectedAbs < playerState.queue.length) {
+			removeFromQueue(selectedAbs);
+		}
+	};
+
+	const clearQueue = () => {
+		clearQueueKeepCurrent();
+	};
+
+	const moveSelected = (direction: 1 | -1) => {
+		const to = selectedAbs + direction;
+		if (selectedAbs < 0 || to < 0 || to >= playerState.queue.length) return;
+
+		moveInQueue(selectedAbs, to);
+
+		// Follow the moved track within the visible window
+		if (direction === 1 && selected === visibleQueue.length - 1) {
+			setScrollOffset(offset => offset + 1);
+		} else if (direction === -1 && selected === 0 && scroll > 0) {
+			setScrollOffset(offset => offset - 1);
+		} else {
+			setSelectedIndex(i => i + direction);
+		}
+	};
+
+	useKeyBinding(['k', 'up'], navigateUp);
+	useKeyBinding(['j', 'down'], navigateDown);
+	useKeyBinding(['d'], removeSelected);
+	useKeyBinding(['c'], clearQueue);
+	useKeyBinding(['['], () => moveSelected(-1));
+	useKeyBinding([']'], () => moveSelected(1));
+
 	if (playerState.queue.length === 0) {
 		return null;
 	}
-
-	// Show only next 5 tracks
-	const visibleQueue = playerState.queue.slice(
-		playerState.queuePosition + 1,
-		playerState.queuePosition + 6,
-	);
 
 	if (visibleQueue.length === 0) {
 		return null;
@@ -38,27 +118,54 @@ function QueueList() {
 
 	return (
 		<Box flexDirection="column">
-			<Text color={theme.colors.dim}>
-				Up next ({playerState.queue.length - playerState.queuePosition - 1}{' '}
-				tracks)
-			</Text>
+			<Box justifyContent="space-between">
+				<Text color={theme.colors.dim}>
+					Up next ({playerState.queue.length - startIndex} tracks)
+				</Text>
+				<Text color={theme.colors.dim}>
+					↑/↓: select • d: remove • c: clear • [/]: reorder
+				</Text>
+			</Box>
+
+			{hasMoreUp && <Text color={theme.colors.dim}>▲ {scroll} more</Text>}
+
 			{visibleQueue.map((track, idx) => {
-				const index = playerState.queuePosition + 1 + idx;
-				const isSelected = index === selectedIndex;
+				const index = startIndex + scroll + idx;
+				const isSelected = idx === selected;
 				const artists = track.artists?.map(a => a.name).join(', ') || 'Unknown';
 				const title = truncate(track.title, getTruncateLength(40));
 
 				return (
 					<Box key={`${track.videoId}-${index}`}>
-						<Text color={theme.colors.dim}>{index + 1}. </Text>
-						<Text color={isSelected ? theme.colors.primary : theme.colors.text}>
+						<Text
+							color={isSelected ? theme.colors.highlight : theme.colors.dim}
+						>
+							{isSelected ? '▶ ' : ''}
+							{index + 1}.{' '}
+						</Text>
+						<Text
+							color={isSelected ? theme.colors.highlight : theme.colors.text}
+							bold={isSelected}
+						>
 							{isFavorite(track.videoId) ? `${ICONS.HEART} ` : ''}
 							{title}
 						</Text>
-						<Text color={theme.colors.dim}> • {artists}</Text>
+						<Text
+							color={isSelected ? theme.colors.highlight : theme.colors.dim}
+						>
+							{' '}
+							• {artists}
+						</Text>
 					</Box>
 				);
 			})}
+
+			{hasMoreDown && (
+				<Text color={theme.colors.dim}>
+					▼ {playerState.queue.length - (startIndex + scroll + MAX_VISIBLE)}{' '}
+					more
+				</Text>
+			)}
 		</Box>
 	);
 }

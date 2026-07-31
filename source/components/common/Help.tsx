@@ -36,8 +36,6 @@ export default function Help() {
 				</Text>
 				<Box paddingX={2}>
 					<Text>
-						<Text color={theme.colors.text}>q</Text> - Quit
-						<Text> | </Text>
 						<Text color={theme.colors.text}>?</Text> - Help
 						<Text> | </Text>
 						<Text color={theme.colors.text}>/</Text> - Search
@@ -50,9 +48,11 @@ export default function Help() {
 						<Text> | </Text>
 						<Text color={theme.colors.text}>,</Text> - Settings
 						<Text> | </Text>
-						<Text color={theme.colors.text}>Shift+Q</Text> - Background Play
-						<Text> | </Text>
 						<Text color={theme.colors.text}>Shift+R</Text> - Resume Control
+						<Text> | </Text>
+						<Text color={theme.colors.text}>:d</Text> - Background Play
+						<Text> | </Text>
+						<Text color={theme.colors.text}>:q</Text> - Quit
 					</Text>
 				</Box>
 
@@ -68,6 +68,8 @@ export default function Help() {
 						<Text> | </Text>
 						<Text color={theme.colors.text}>b</Text> - Previous
 						<Text> | </Text>
+						<Text color={theme.colors.text}>q</Text> - Add to Queue
+						<Text> | </Text>
 						<Text color={theme.colors.text}>+/=</Text> - Volume Up
 						<Text> | </Text>
 						<Text color={theme.colors.text}>-</Text> - Volume Down
@@ -75,6 +77,15 @@ export default function Help() {
 						<Text color={theme.colors.text}>Shift+S</Text> - Toggle Shuffle
 						<Text> | </Text>
 						<Text color={theme.colors.text}>Shift+L</Text> - Toggle Repeat
+						<Text> | </Text>
+						<Text color={theme.colors.text}>↑/↓</Text> (or{' '}
+						<Text color={theme.colors.text}>k/j</Text>) - Queue: move selection
+						<Text> | </Text>
+						<Text color={theme.colors.text}>d</Text> - Queue: remove selection
+						<Text> | </Text>
+						<Text color={theme.colors.text}>c</Text> - Queue: clear
+						<Text> | </Text>
+						<Text color={theme.colors.text}>[ / ]</Text> - Queue: reorder
 					</Text>
 				</Box>
 
@@ -153,8 +164,7 @@ export default function Help() {
 				{/* Instructions */}
 				<Text color={theme.colors.dim}>
 					Press <Text color={theme.colors.text}>Esc</Text>,{' '}
-					<Text color={theme.colors.text}>Enter</Text>,{' '}
-					<Text color={theme.colors.text}>q</Text>, or{' '}
+					<Text color={theme.colors.text}>Enter</Text>, or{' '}
 					<Text color={theme.colors.text}>?</Text> to close
 				</Text>
 			</Box>
