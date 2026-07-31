@@ -20,7 +20,6 @@ export type PlayOptions = {
 	cookiesFile?: string;
 	cookiesFromBrowser?: CookiesFromBrowser;
 	gaplessPlayback?: boolean;
-	crossfadeDuration?: number;
 	equalizerPreset?: EqualizerPreset;
 	volumeFadeDuration?: number;
 	duration?: number;
@@ -38,7 +37,6 @@ export function buildMpvArgs(
 	options: MpvArgsOptions,
 ): string[] {
 	const gapless = options.gaplessPlayback ?? true;
-	const crossfadeDuration = Math.max(0, options.crossfadeDuration ?? 0);
 	const fadeDuration = Math.max(0, options.volumeFadeDuration ?? 0);
 	const eqPreset = options.equalizerPreset ?? 'flat';
 	const audioFilters: string[] = [];
@@ -55,9 +53,10 @@ export function buildMpvArgs(
 		}
 	}
 
-	if (crossfadeDuration > 0) {
-		audioFilters.push(`acrossfade=d=${crossfadeDuration}`);
-	}
+	// NOTE: The legacy crossfade setting was removed. mpv's --af chain is
+	// single-stream and the two-input FFmpeg acrossfade filter made mpv exit
+	// with "no audio or video data played". Gapless audio covers gap-free
+	// playback.
 
 	const presetFilters = EQUALIZER_PRESET_FILTERS[eqPreset] ?? [];
 	if (presetFilters.length > 0) {
@@ -682,7 +681,6 @@ class PlayerService {
 					cookiesFromBrowser:
 						options?.cookiesFromBrowser ?? config.get('cookiesFromBrowser'),
 					gaplessPlayback: options?.gaplessPlayback,
-					crossfadeDuration: options?.crossfadeDuration,
 					equalizerPreset: options?.equalizerPreset,
 					subtitlesEnabled: config.get('subtitlesEnabled'),
 				});
@@ -738,6 +736,15 @@ class PlayerService {
 							.catch(error => {
 								this.ipcConnectAbort = null;
 								this.ipcConnectPending = null;
+
+								// The pending connect was aborted because a newer
+								// play() called stop(). Don't reject or clean up —
+								// that would kill the new session and trigger a
+								// retry of the stale track.
+								if (isStalePlay()) {
+									return;
+								}
+
 								reject(error);
 								logger.warn('PlayerService', 'Failed to connect IPC', {
 									error: formatError(error),
@@ -836,6 +843,8 @@ class PlayerService {
 	}
 
 	async pause(): Promise<void> {
+		const pauseGeneration = this.playGeneration;
+
 		logger.debug('PlayerService', 'pause() called', {
 			hasIpcSocket: Boolean(this.ipcSocket),
 			ipcDestroyed: this.ipcSocket?.destroyed ?? true,
@@ -846,6 +855,26 @@ class PlayerService {
 		if (this.ipcSocket && !this.ipcSocket.destroyed) {
 			this.sendIpcCommand(['set_property', 'pause', true]);
 			return;
+		}
+
+		// An IPC connection may still be in flight (mpv just spawned). Wait
+		// for it so pause reaches mpv instead of racing the connect with a
+		// reconnect that destroys its socket.
+		if (this.ipcConnectPending) {
+			try {
+				await this.ipcConnectPending;
+			} catch {
+				// Connection failed or aborted; reconnect/stop below decides.
+			}
+
+			if (pauseGeneration !== this.playGeneration) {
+				return;
+			}
+
+			if (this.ipcSocket && !this.ipcSocket.destroyed) {
+				this.sendIpcCommand(['set_property', 'pause', true]);
+				return;
+			}
 		}
 
 		// IPC dropped but mpv still running — reconnect so pause actually reaches mpv.
@@ -1000,7 +1029,8 @@ class PlayerService {
 
 				this.mpvProcess = null;
 				this.isPlaying = false;
-				this.currentTrackId = null;
+				// Keep currentTrackId so the store's play/pause effect can still
+				// match the loaded track and resume() instead of restarting.
 				logger.info('PlayerService', 'mpv process killed');
 			} catch (error) {
 				logger.error('PlayerService', 'Error killing mpv process', {

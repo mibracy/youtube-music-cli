@@ -64,7 +64,6 @@ function getPlaybackOptions(volume: number) {
 		audioNormalization: config.get('audioNormalization'),
 		volumeFadeDuration: config.get('volumeFadeDuration'),
 		gaplessPlayback: config.get('gaplessPlayback'),
-		crossfadeDuration: config.get('crossfadeDuration'),
 		equalizerPreset: config.get('equalizerPreset'),
 	};
 }

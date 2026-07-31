@@ -51,7 +51,6 @@ class ConfigService {
 				},
 			},
 			gaplessPlayback: true,
-			crossfadeDuration: 0,
 			volumeFadeDuration: 0,
 			equalizerPreset: 'flat',
 		};

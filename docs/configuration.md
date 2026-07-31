@@ -17,7 +17,6 @@ youtube-music-cli stores its configuration in `~/.youtube-music-cli/config.json`
 	"repeat": "off",
 	"streamQuality": "high",
 	"gaplessPlayback": true,
-	"crossfadeDuration": 0,
 	"equalizerPreset": "flat",
 	"downloadsEnabled": false,
 	"downloadDirectory": "D:/Music/youtube-music-cli",
@@ -101,12 +100,6 @@ Audio streaming quality.
 Enable or disable mpv's gapless audio flag. When turned on (default), mpv will avoid inserting silence between tracks when possible.
 
 **Default:** `true`
-
-### crossfadeDuration
-
-Sets the duration in seconds used for mpv's acrossfade filter between tracks. The Settings menu cycles through Off (0s), 1s, 2s, 3s, and 5s values.
-
-**Default:** `0`
 
 ### equalizerPreset
 

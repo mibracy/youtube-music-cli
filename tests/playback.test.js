@@ -88,6 +88,65 @@ test('ADD_TO_QUEUE appends and bumps explicitQueueLength', async () => {
 	expect(next.explicitQueueLength).toBe(2);
 });
 
+test('MOVE_IN_QUEUE in standalone playback keeps queuePosition when moving to front', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b', 'c'].map(makeTrack);
+	const current = makeTrack('x'); // not in the queue (standalone play)
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 0,
+		currentTrack: current,
+	});
+	const next = playerReducer(state, {category: 'MOVE_IN_QUEUE', from: 1, to: 0});
+	expect(next.queue.map(track => track.videoId)).toEqual(['b', 'a', 'c']);
+	// The moved track must remain the first "up next" — not orphaned
+	expect(next.queuePosition).toBe(0);
+	expect(next.currentTrack?.videoId).toBe('x');
+});
+
+test('MOVE_IN_QUEUE in standalone playback keeps queuePosition at mid-queue', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b', 'c', 'd', 'e'].map(makeTrack);
+	const current = makeTrack('x'); // not in the queue
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 2,
+		currentTrack: current,
+	});
+	const next = playerReducer(state, {category: 'MOVE_IN_QUEUE', from: 3, to: 2});
+	expect(next.queue.map(track => track.videoId)).toEqual(['a', 'b', 'd', 'c', 'e']);
+	expect(next.queuePosition).toBe(2);
+	expect(next.queue[next.queuePosition]?.videoId).toBe('d');
+});
+
+test('MOVE_IN_QUEUE in-queue playback keeps current track position', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b', 'c'].map(makeTrack);
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 0,
+		currentTrack: tracks[0],
+	});
+	const next = playerReducer(state, {category: 'MOVE_IN_QUEUE', from: 2, to: 1});
+	expect(next.queue.map(track => track.videoId)).toEqual(['a', 'c', 'b']);
+	expect(next.queuePosition).toBe(0);
+});
+
+test('MOVE_IN_QUEUE adjusts queuePosition when moving into the current slot (in-queue)', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['a', 'b', 'c', 'd'].map(makeTrack);
+	const state = makeState({
+		queue: tracks,
+		queuePosition: 2,
+		currentTrack: tracks[2],
+	});
+	const next = playerReducer(state, {category: 'MOVE_IN_QUEUE', from: 3, to: 2});
+	expect(next.queue.map(track => track.videoId)).toEqual(['a', 'b', 'd', 'c']);
+	// queuePosition follows the current track to its new index
+	expect(next.queuePosition).toBe(3);
+	expect(next.currentTrack?.videoId).toBe('c');
+});
+
 test('NEXT with shuffle=true and single-track queue falls through sequentially (no-op)', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const track = makeTrack('a');

@@ -14,12 +14,11 @@ test('player-service-mpv-args: buildMpvArgs respects the gapless playback toggle
 	expect(args.includes('--gapless-audio=yes')).toBe(false);
 });
 
-test('player-service-mpv-args: buildMpvArgs adds acrossfade and normalization filters when configured', async () => {
+test('player-service-mpv-args: buildMpvArgs adds normalization and fade filters but never acrossfade', async () => {
 	const {buildMpvArgs} =
 		await import('../source/services/player/player.service.ts');
 	const args = buildMpvArgs(IPC_PATH, {
 		volume: 55,
-		crossfadeDuration: 4,
 		audioNormalization: true,
 		volumeFadeDuration: 2,
 		duration: 300,
@@ -27,7 +26,7 @@ test('player-service-mpv-args: buildMpvArgs adds acrossfade and normalization fi
 
 	const filterArg = args.find(arg => arg.startsWith('--af='));
 	expect(filterArg).toBeTruthy();
-	expect(filterArg?.includes('acrossfade=d=4')).toBe(true);
+	expect(filterArg?.includes('acrossfade')).toBe(false);
 	expect(filterArg?.includes('dynaudnorm')).toBe(true);
 	expect(filterArg?.includes('afade=t=in')).toBe(true);
 	expect(filterArg?.includes('afade=t=out')).toBe(true);

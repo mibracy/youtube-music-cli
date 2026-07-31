@@ -18,11 +18,10 @@ import type {SettingsRow} from '../ui/settings-overlay.ts';
 
 type ConfigService = ReturnType<typeof getConfigService>;
 
-export const IMMERSIVE_SETTINGS_COUNT = 26;
+export const IMMERSIVE_SETTINGS_COUNT = 25;
 
 const QUALITIES: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
 const DOWNLOAD_FORMATS: DownloadFormat[] = ['mp3', 'm4a'];
-const CROSSFADE_PRESETS = [0, 1, 2, 3, 5];
 const VOLUME_FADE_PRESETS = [0, 1, 2, 3, 5];
 const EQUALIZER_PRESETS: EqualizerPreset[] = [
 	'flat',
@@ -59,10 +58,10 @@ export function createSleepTimerState(): SleepTimerState {
 }
 
 export function getSettingsRowKind(index: number): SettingsRowKind {
-	if (index === 10 || index === 14 || index === 16 || index === 20) {
+	if (index === 9 || index === 13 || index === 15 || index === 19) {
 		return 'text';
 	}
-	if (index >= 22) {
+	if (index >= 21) {
 		return 'navigate';
 	}
 	return 'cycle';
@@ -70,13 +69,13 @@ export function getSettingsRowKind(index: number): SettingsRowKind {
 
 export function getSettingsTextField(index: number): SettingsTextField | null {
 	switch (index) {
-		case 10:
+		case 9:
 			return 'llmApiKey';
-		case 14:
+		case 13:
 			return 'llmBaseUrl';
-		case 16:
+		case 15:
 			return 'downloadDirectory';
-		case 20:
+		case 19:
 			return 'cookiesFile';
 		default:
 			return null;
@@ -139,7 +138,6 @@ export function buildImmersiveSettingsRows(
 	const llmTemperature = llmConfig?.temperature ?? 0.7;
 	const llmEndpoint = llmConfig?.endpoint ?? '';
 	const llmBaseUrl = llmConfig?.baseUrl ?? '';
-	const crossfade = config.get('crossfadeDuration') ?? 0;
 	const volumeFade = config.get('volumeFadeDuration') ?? 0;
 	const equalizer = config.get('equalizerPreset') ?? 'flat';
 	const quality = config.get('streamQuality') ?? 'high';
@@ -164,7 +162,6 @@ export function buildImmersiveSettingsRows(
 			label: 'Gapless Playback',
 			value: formatOnOff(config.get('gaplessPlayback') ?? true),
 		},
-		{label: 'Crossfade', value: formatToggleOff(crossfade)},
 		{label: 'Volume Fade', value: formatToggleOff(volumeFade)},
 		{label: 'Equalizer', value: formatEqualizerLabel(equalizer)},
 		{
@@ -294,17 +291,6 @@ export function cycleImmersiveSetting(
 			return `Gapless playback: ${formatOnOff(next)}`;
 		}
 		case 3: {
-			const current = config.get('crossfadeDuration') ?? 0;
-			const currentIndex = CROSSFADE_PRESETS.indexOf(current);
-			const next =
-				CROSSFADE_PRESETS[
-					(currentIndex === -1 ? 0 : currentIndex + 1) %
-						CROSSFADE_PRESETS.length
-				] ?? 0;
-			config.set('crossfadeDuration', next);
-			return next === 0 ? 'Crossfade: Off' : `Crossfade: ${next}s`;
-		}
-		case 4: {
 			const current = config.get('volumeFadeDuration') ?? 0;
 			const currentIndex = VOLUME_FADE_PRESETS.indexOf(current);
 			const next =
@@ -315,7 +301,7 @@ export function cycleImmersiveSetting(
 			config.set('volumeFadeDuration', next);
 			return next === 0 ? 'Volume fade: Off' : `Volume fade: ${next}s`;
 		}
-		case 5: {
+		case 4: {
 			const current = config.get('equalizerPreset') ?? 'flat';
 			const currentIndex = EQUALIZER_PRESETS.indexOf(current);
 			const nextPreset =
@@ -324,27 +310,27 @@ export function cycleImmersiveSetting(
 			config.set('equalizerPreset', nextPreset);
 			return `Equalizer: ${formatEqualizerLabel(nextPreset)}`;
 		}
-		case 6: {
+		case 5: {
 			const next = !(config.get('subtitlesEnabled') ?? false);
 			config.set('subtitlesEnabled', next);
 			return `Subtitles: ${formatOnOff(next)}`;
 		}
-		case 7: {
+		case 6: {
 			const next = !(config.get('notifications') ?? false);
 			config.set('notifications', next);
 			return `Notifications: ${formatOnOff(next)}`;
 		}
-		case 8: {
+		case 7: {
 			const next = !(config.get('discordRichPresence') ?? false);
 			config.set('discordRichPresence', next);
 			return `Discord Rich Presence: ${formatOnOff(next)}`;
 		}
-		case 9: {
+		case 8: {
 			const next = !config.getLLMEnabled();
 			config.setLLMEnabled(next);
 			return `AI Assistant: ${formatOnOff(next)}`;
 		}
-		case 11: {
+		case 10: {
 			const current = config.getLLMConfig()?.model ?? 'gemini-2.0-flash';
 			const currentIndex = LLM_MODELS.indexOf(current);
 			const nextModel =
@@ -353,7 +339,7 @@ export function cycleImmersiveSetting(
 			config.setLLMConfig({...config.getLLMConfig(), model: nextModel});
 			return `Model: ${nextModel}`;
 		}
-		case 12: {
+		case 11: {
 			const current = config.getLLMConfig()?.temperature ?? 0.7;
 			const currentIndex = LLM_TEMPERATURES.indexOf(current);
 			const nextTemp =
@@ -361,7 +347,7 @@ export function cycleImmersiveSetting(
 			config.setLLMConfig({...config.getLLMConfig(), temperature: nextTemp});
 			return `Temperature: ${nextTemp.toFixed(1)}`;
 		}
-		case 13: {
+		case 12: {
 			const current = config.getLLMConfig()?.endpoint ?? '';
 			const currentIndex = LLM_ENDPOINTS.indexOf(current);
 			const nextEndpoint =
@@ -371,12 +357,12 @@ export function cycleImmersiveSetting(
 				? `Endpoint: ${shortenUrl(nextEndpoint)}`
 				: 'Endpoint: Default (Gemini)';
 		}
-		case 15: {
+		case 14: {
 			const next = !(config.get('downloadsEnabled') ?? false);
 			config.set('downloadsEnabled', next);
 			return `Download feature: ${formatOnOff(next)}`;
 		}
-		case 17: {
+		case 16: {
 			const current = config.get('downloadFormat') ?? 'mp3';
 			const currentIndex = DOWNLOAD_FORMATS.indexOf(current);
 			const nextFormat =
@@ -384,17 +370,17 @@ export function cycleImmersiveSetting(
 			config.set('downloadFormat', nextFormat);
 			return `Download format: ${nextFormat.toUpperCase()}`;
 		}
-		case 18: {
+		case 17: {
 			const next = !(config.get('preferLocalPlayback') ?? true);
 			config.set('preferLocalPlayback', next);
 			return `Prefer local playback: ${formatOnOff(next)}`;
 		}
-		case 19: {
+		case 18: {
 			const next = nextCookiesFromBrowser(config.get('cookiesFromBrowser'));
 			config.set('cookiesFromBrowser', next);
 			return `Cookies from browser: ${formatCookiesFromBrowserLabel(next)}`;
 		}
-		case 21: {
+		case 20: {
 			const timerService = getSleepTimerService();
 			if (timerService.isActive()) {
 				timerService.cancel();
@@ -413,13 +399,13 @@ export function cycleImmersiveSetting(
 			timerService.start(nextPreset, options.onSleepTimerExpire);
 			return `Sleep timer: ${nextPreset} min`;
 		}
-		case 22:
+		case 21:
 			return 'Import Playlists: run youtube-music-cli (standard TUI) for this feature';
-		case 23:
+		case 22:
 			return 'Export Playlists: run youtube-music-cli (standard TUI) for this feature';
-		case 24:
+		case 23:
 			return 'Custom Keybindings: run youtube-music-cli (standard TUI) for this feature';
-		case 25:
+		case 24:
 			return 'Manage Plugins: run youtube-music-cli (standard TUI) for this feature';
 		default:
 			return null;

@@ -56,7 +56,10 @@ function QueueList() {
 	const hasMoreUp = scroll > 0;
 	const hasMoreDown =
 		startIndex + scroll + MAX_VISIBLE < playerState.queue.length;
-	const selected = Math.min(selectedIndex, visibleQueue.length - 1);
+	const selected = Math.min(
+		Math.max(selectedIndex, 0),
+		visibleQueue.length - 1,
+	);
 	const selectedAbs = startIndex + scroll + selected;
 
 	const navigateUp = () => {
@@ -87,7 +90,13 @@ function QueueList() {
 
 	const moveSelected = (direction: 1 | -1) => {
 		const to = selectedAbs + direction;
-		if (selectedAbs < 0 || to < 0 || to >= playerState.queue.length) return;
+		if (
+			selectedAbs < startIndex ||
+			to < startIndex ||
+			to >= playerState.queue.length
+		) {
+			return;
+		}
 
 		moveInQueue(selectedAbs, to);
 
@@ -101,8 +110,10 @@ function QueueList() {
 		}
 	};
 
-	useKeyBinding(['k', 'up'], navigateUp);
-	useKeyBinding(['j', 'down'], navigateDown);
+	useKeyBinding(['up'], navigateUp);
+	useKeyBinding(['down'], navigateDown);
+	useKeyBinding(['k'], () => moveSelected(-1));
+	useKeyBinding(['j'], () => moveSelected(1));
 	useKeyBinding(['d'], removeSelected);
 	useKeyBinding(['c'], clearQueue);
 	useKeyBinding(['['], () => moveSelected(-1));
@@ -123,7 +134,7 @@ function QueueList() {
 					Up next ({playerState.queue.length - startIndex} tracks)
 				</Text>
 				<Text color={theme.colors.dim}>
-					↑/↓: select • d: remove • c: clear • [/]: reorder
+					↑/↓: select • j/k: reorder • d: remove • c: clear
 				</Text>
 			</Box>
 

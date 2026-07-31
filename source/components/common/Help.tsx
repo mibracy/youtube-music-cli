@@ -78,14 +78,14 @@ export default function Help() {
 						<Text> | </Text>
 						<Text color={theme.colors.text}>Shift+L</Text> - Toggle Repeat
 						<Text> | </Text>
-						<Text color={theme.colors.text}>↑/↓</Text> (or{' '}
-						<Text color={theme.colors.text}>k/j</Text>) - Queue: move selection
+						<Text color={theme.colors.text}>↑/↓</Text> - Queue: move selection
 						<Text> | </Text>
 						<Text color={theme.colors.text}>d</Text> - Queue: remove selection
 						<Text> | </Text>
 						<Text color={theme.colors.text}>c</Text> - Queue: clear
 						<Text> | </Text>
-						<Text color={theme.colors.text}>[ / ]</Text> - Queue: reorder
+						<Text color={theme.colors.text}>j/k</Text> (or{' '}
+						<Text color={theme.colors.text}>[ / ]</Text>) - Queue: reorder
 					</Text>
 				</Box>
 

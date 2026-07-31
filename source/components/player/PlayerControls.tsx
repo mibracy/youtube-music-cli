@@ -15,7 +15,6 @@ import {formatTime} from '../../utils/format.ts';
 
 let mountCount = 0;
 
-const CROSSFADE_PRESETS = [0, 1, 2, 3, 5];
 const EQUALIZER_PRESETS: EqualizerPreset[] = [
 	'flat',
 	'bass_boost',
@@ -60,9 +59,6 @@ export default function PlayerControls() {
 	const [gaplessPlayback, setGaplessPlayback] = useState(
 		config.get('gaplessPlayback') ?? true,
 	);
-	const [crossfadeDuration, setCrossfadeDuration] = useState(
-		config.get('crossfadeDuration') ?? 0,
-	);
 	const [equalizerPreset, setEqualizerPreset] = useState<EqualizerPreset>(
 		config.get('equalizerPreset') ?? 'flat',
 	);
@@ -79,15 +75,6 @@ export default function PlayerControls() {
 		const next = !gaplessPlayback;
 		setGaplessPlayback(next);
 		config.set('gaplessPlayback', next);
-	};
-
-	const cycleCrossfadeDuration = () => {
-		const currentIndex = CROSSFADE_PRESETS.indexOf(crossfadeDuration);
-		const nextIndex =
-			currentIndex === -1 ? 0 : (currentIndex + 1) % CROSSFADE_PRESETS.length;
-		const next = CROSSFADE_PRESETS[nextIndex] ?? 0;
-		setCrossfadeDuration(next);
-		config.set('crossfadeDuration', next);
 	};
 
 	const cycleEqualizerPreset = () => {
@@ -118,7 +105,6 @@ export default function PlayerControls() {
 	useKeyBinding(KEYBINDINGS.SPEED_DOWN, speedDown);
 	useKeyBinding(KEYBINDINGS.SHUFFLE, toggleShuffle);
 	useKeyBinding(KEYBINDINGS.GAPLESS_TOGGLE, toggleGaplessPlayback);
-	useKeyBinding(KEYBINDINGS.CROSSFADE_CYCLE, cycleCrossfadeDuration);
 	useKeyBinding(KEYBINDINGS.EQUALIZER_CYCLE, cycleEqualizerPreset);
 
 	useKeyBinding(KEYBINDINGS.AB_LOOP_A, handleABLoopA);
@@ -236,9 +222,6 @@ export default function PlayerControls() {
 			<Box flexDirection="row" flexWrap="wrap" columnGap={4} paddingX={2}>
 				<Text color={gaplessPlayback ? theme.colors.primary : theme.colors.dim}>
 					Gapless: {gaplessPlayback ? 'ON' : 'OFF'}
-				</Text>
-				<Text color={theme.colors.text}>
-					Crossfade: {crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}
 				</Text>
 				<Text color={theme.colors.text}>
 					Equalizer: {formatEqualizerLabel(equalizerPreset)}

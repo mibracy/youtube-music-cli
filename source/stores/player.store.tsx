@@ -237,7 +237,26 @@ export function playerReducer(
 			};
 
 		case 'ADD_TO_QUEUE':
-			return {...state, queue: [...state.queue, action.track]};
+			return {
+				...state,
+				queue: [...state.queue, action.track],
+				explicitQueueLength:
+					(state.explicitQueueLength ?? state.queue.length) + 1,
+			};
+
+		case 'PLAY_NEXT': {
+			const insertAt = Math.min(state.queuePosition + 1, state.queue.length);
+			const newQueue = [...state.queue];
+			newQueue.splice(insertAt, 0, action.track);
+			const explicitBase = state.explicitQueueLength ?? state.queue.length;
+			const explicitQueueLength =
+				insertAt <= explicitBase ? explicitBase + 1 : explicitBase;
+			return {
+				...state,
+				queue: newQueue,
+				explicitQueueLength,
+			};
+		}
 
 		case 'REMOVE_FROM_QUEUE': {
 			const newQueue = [...state.queue];
@@ -274,14 +293,25 @@ export function playerReducer(
 			newQueue.splice(from, 1);
 			newQueue.splice(to, 0, moved);
 
-			// Keep the same track current when reordering around it.
+			// Keep the same track current when reordering around it. Only
+			// adjust queuePosition when it actually points at the current
+			// track (in-queue playback). In standalone playback the current
+			// track is not in the queue, so queuePosition is just the "up
+			// next" pointer — shifting it when a track is moved to the front
+			// orphans the moved track (it disappears from the list and is
+			// skipped by NEXT).
 			let queuePosition = state.queuePosition;
-			if (from === state.queuePosition) {
-				queuePosition = to;
-			} else if (from < state.queuePosition && to >= state.queuePosition) {
-				queuePosition--;
-			} else if (from > state.queuePosition && to <= state.queuePosition) {
-				queuePosition++;
+			const currentInQueue =
+				state.currentTrack?.videoId ===
+				state.queue[state.queuePosition]?.videoId;
+			if (currentInQueue) {
+				if (from === state.queuePosition) {
+					queuePosition = to;
+				} else if (from < state.queuePosition && to >= state.queuePosition) {
+					queuePosition--;
+				} else if (from > state.queuePosition && to <= state.queuePosition) {
+					queuePosition++;
+				}
 			}
 
 			return {...state, queue: newQueue, queuePosition};
@@ -455,6 +485,7 @@ type PlayerContextValue = {
 	toggleAutoplay: () => void;
 	setQueue: (queue: Track[]) => void;
 	addToQueue: (track: Track) => void;
+	playNext: (track: Track) => void;
 	removeFromQueue: (index: number) => void;
 	moveInQueue: (from: number, to: number) => void;
 	clearQueue: () => void;
@@ -703,7 +734,6 @@ function PlayerManager() {
 						audioNormalization: config.get('audioNormalization') ?? false,
 						proxy: config.get('proxy'),
 						gaplessPlayback: config.get('gaplessPlayback') ?? true,
-						crossfadeDuration: config.get('crossfadeDuration') ?? 0,
 						equalizerPreset: config.get('equalizerPreset') ?? 'flat',
 						volumeFadeDuration: config.get('volumeFadeDuration') ?? 0,
 						duration: track.duration,
@@ -1226,6 +1256,7 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 			toggleAutoplay: () => dispatch({category: 'TOGGLE_AUTOPLAY'}),
 			setQueue: (queue: Track[]) => dispatch({category: 'SET_QUEUE', queue}),
 			addToQueue: (track: Track) => dispatch({category: 'ADD_TO_QUEUE', track}),
+			playNext: (track: Track) => dispatch({category: 'PLAY_NEXT', track}),
 			removeFromQueue: (index: number) =>
 				dispatch({category: 'REMOVE_FROM_QUEUE', index}),
 			moveInQueue: (from: number, to: number) =>

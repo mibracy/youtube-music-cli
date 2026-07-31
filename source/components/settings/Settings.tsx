@@ -22,7 +22,6 @@ import {
 
 const QUALITIES: Array<'low' | 'medium' | 'high'> = ['low', 'medium', 'high'];
 const DOWNLOAD_FORMATS: DownloadFormat[] = ['mp3', 'm4a'];
-const CROSSFADE_PRESETS = [0, 1, 2, 3, 5];
 const EQUALIZER_PRESETS: EqualizerPreset[] = [
 	'flat',
 	'bass_boost',
@@ -48,7 +47,6 @@ const SETTINGS_ITEMS = [
 	'Stream Quality',
 	'Audio Normalization',
 	'Gapless Playback',
-	'Crossfade Duration',
 	'Volume Fade Duration',
 	'Equalizer Preset',
 	'Subtitles',
@@ -84,9 +82,6 @@ export default function Settings() {
 	);
 	const [gaplessPlayback, setGaplessPlayback] = useState(
 		config.get('gaplessPlayback') ?? true,
-	);
-	const [crossfadeDuration, setCrossfadeDuration] = useState(
-		config.get('crossfadeDuration') ?? 0,
 	);
 	const [volumeFadeDuration, setVolumeFadeDuration] = useState(
 		config.get('volumeFadeDuration') ?? 0,
@@ -208,15 +203,6 @@ export default function Settings() {
 		const next = !gaplessPlayback;
 		setGaplessPlayback(next);
 		config.set('gaplessPlayback', next);
-	};
-
-	const cycleCrossfadeDuration = () => {
-		const currentIndex = CROSSFADE_PRESETS.indexOf(crossfadeDuration);
-		const nextIndex =
-			currentIndex === -1 ? 0 : (currentIndex + 1) % CROSSFADE_PRESETS.length;
-		const next = CROSSFADE_PRESETS[nextIndex] ?? 0;
-		setCrossfadeDuration(next);
-		config.set('crossfadeDuration', next);
 	};
 
 	const cycleVolumeFadeDuration = () => {
@@ -364,50 +350,48 @@ export default function Settings() {
 		} else if (actualIndex === 3) {
 			toggleGaplessPlayback();
 		} else if (actualIndex === 4) {
-			cycleCrossfadeDuration();
-		} else if (actualIndex === 5) {
 			cycleVolumeFadeDuration();
-		} else if (actualIndex === 6) {
+		} else if (actualIndex === 5) {
 			cycleEqualizerPreset();
-		} else if (actualIndex === 7) {
+		} else if (actualIndex === 6) {
 			toggleSubtitles();
-		} else if (actualIndex === 8) {
+		} else if (actualIndex === 7) {
 			toggleNotifications();
-		} else if (actualIndex === 9) {
+		} else if (actualIndex === 8) {
 			toggleDiscordRpc();
-		} else if (actualIndex === 10) {
+		} else if (actualIndex === 9) {
 			toggleLLMEnabled();
-		} else if (actualIndex === 11) {
+		} else if (actualIndex === 10) {
 			setIsEditingApiKey(true);
-		} else if (actualIndex === 12) {
+		} else if (actualIndex === 11) {
 			cycleLLMModel();
-		} else if (actualIndex === 13) {
+		} else if (actualIndex === 12) {
 			cycleLLMTemperature();
-		} else if (actualIndex === 14) {
+		} else if (actualIndex === 13) {
 			cycleLLMEndpoint();
-		} else if (actualIndex === 15) {
+		} else if (actualIndex === 14) {
 			setIsEditingBaseUrl(true);
-		} else if (actualIndex === 16) {
+		} else if (actualIndex === 15) {
 			toggleDownloadsEnabled();
-		} else if (actualIndex === 17) {
+		} else if (actualIndex === 16) {
 			setIsEditingDownloadDirectory(true);
-		} else if (actualIndex === 18) {
+		} else if (actualIndex === 17) {
 			cycleDownloadFormat();
-		} else if (actualIndex === 19) {
+		} else if (actualIndex === 18) {
 			togglePreferLocalPlayback();
-		} else if (actualIndex === 20) {
+		} else if (actualIndex === 19) {
 			cycleCookiesFromBrowser();
-		} else if (actualIndex === 21) {
+		} else if (actualIndex === 20) {
 			setIsEditingCookiesFile(true);
-		} else if (actualIndex === 22) {
+		} else if (actualIndex === 21) {
 			cycleSleepTimer();
-		} else if (actualIndex === 23) {
+		} else if (actualIndex === 22) {
 			dispatch({category: 'NAVIGATE', view: VIEW.IMPORT});
-		} else if (actualIndex === 24) {
+		} else if (actualIndex === 23) {
 			dispatch({category: 'NAVIGATE', view: VIEW.EXPORT_PLAYLISTS});
-		} else if (actualIndex === 25) {
+		} else if (actualIndex === 24) {
 			dispatch({category: 'NAVIGATE', view: VIEW.KEYBINDINGS});
-		} else if (actualIndex === 26) {
+		} else if (actualIndex === 25) {
 			dispatch({category: 'NAVIGATE', view: VIEW.PLUGINS});
 		}
 	};
@@ -450,26 +434,22 @@ export default function Settings() {
 				return box(`Gapless Playback: ${gaplessPlayback ? 'ON' : 'OFF'}`);
 			case 4:
 				return box(
-					`Crossfade: ${crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}`,
-				);
-			case 5:
-				return box(
 					`Volume Fade: ${volumeFadeDuration === 0 ? 'Off' : `${volumeFadeDuration}s`}`,
 				);
-			case 6:
+			case 5:
 				return box(`Equalizer: ${formatEqualizerLabel(equalizerPreset)}`);
-			case 7:
+			case 6:
 				return box(`Subtitles: ${subtitlesEnabled ? 'ON' : 'OFF'}`);
-			case 8:
+			case 7:
 				return box(`Desktop Notifications: ${notifications ? 'ON' : 'OFF'}`);
-			case 9:
+			case 8:
 				return box(`Discord Rich Presence: ${discordRpc ? 'ON' : 'OFF'}`);
-			case 10:
+			case 9:
 				return box(`AI Assistant: ${llmEnabled ? 'ON' : 'OFF'}`);
-			case 11:
+			case 10:
 				if (isEditingApiKey && isSelected) {
 					return (
-						<Box key={11} paddingX={1}>
+						<Box key={10} paddingX={1}>
 							<TextInput
 								value={llmApiKey}
 								onChange={setLLMApiKey}
@@ -488,18 +468,18 @@ export default function Settings() {
 				return box(
 					`API Key: ${llmApiKey ? `${llmApiKey.slice(0, 4)}...${llmApiKey.slice(-4)}` : '(not set)'}`,
 				);
-			case 12:
+			case 11:
 				return box(`Model: ${llmModel}`);
-			case 13:
+			case 12:
 				return box(`Temperature: ${llmTemperature.toFixed(1)}`);
-			case 14:
+			case 13:
 				return box(
 					`Endpoint: ${llmEndpoint ? llmEndpoint.replace('https://', '').substring(0, 30) : 'Default (Gemini)'}`,
 				);
-			case 15:
+			case 14:
 				if (isEditingBaseUrl && isSelected) {
 					return (
-						<Box key={15} paddingX={1}>
+						<Box key={14} paddingX={1}>
 							<TextInput
 								value={llmBaseUrl}
 								onChange={setLLMBaseUrl}
@@ -521,12 +501,12 @@ export default function Settings() {
 				return box(
 					`Base URL: ${llmBaseUrl ? llmBaseUrl.replace('https://', '').substring(0, 30) : '(not set)'}`,
 				);
-			case 16:
+			case 15:
 				return box(`Download Feature: ${downloadsEnabled ? 'ON' : 'OFF'}`);
-			case 17:
+			case 16:
 				if (isEditingDownloadDirectory && isSelected) {
 					return (
-						<Box key={17} paddingX={1}>
+						<Box key={16} paddingX={1}>
 							<TextInput
 								value={downloadDirectory}
 								onChange={setDownloadDirectory}
@@ -547,20 +527,20 @@ export default function Settings() {
 					);
 				}
 				return box(`Download Folder: ${downloadDirectory}`);
-			case 18:
+			case 17:
 				return box(`Download Format: ${downloadFormat.toUpperCase()}`);
-			case 19:
+			case 18:
 				return box(
 					`Prefer Local Playback: ${preferLocalPlayback ? 'ON' : 'OFF'}`,
 				);
-			case 20:
+			case 19:
 				return box(
 					`Cookies From Browser: ${formatCookiesFromBrowserLabel(cookiesFromBrowser)}`,
 				);
-			case 21:
+			case 20:
 				if (isEditingCookiesFile && isSelected) {
 					return (
-						<Box key={21} paddingX={1}>
+						<Box key={20} paddingX={1}>
 							<TextInput
 								value={cookiesFile}
 								onChange={setCookiesFile}
@@ -572,9 +552,9 @@ export default function Settings() {
 					);
 				}
 				return box(`Cookies File: ${cookiesFile || '(not set)'}`);
-			case 22:
+			case 21:
 				return (
-					<Box key={22} paddingX={1}>
+					<Box key={21} paddingX={1}>
 						<Text
 							backgroundColor={bg}
 							color={
@@ -590,13 +570,13 @@ export default function Settings() {
 						</Text>
 					</Box>
 				);
-			case 23:
+			case 22:
 				return box('Import Playlists →');
-			case 24:
+			case 23:
 				return box('Export Playlists →');
-			case 25:
+			case 24:
 				return box('Custom Keybindings →');
-			case 26:
+			case 25:
 				return box('Manage Plugins');
 			default:
 				return null;

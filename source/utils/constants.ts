@@ -122,7 +122,6 @@ export const KEYBINDINGS = {
 	REPEAT: ['shift+l'],
 	AUTOPLAY_TOGGLE: ['shift+a'],
 	GAPLESS_TOGGLE: ['shift+g'],
-	CROSSFADE_CYCLE: ['shift+c'],
 	EQUALIZER_CYCLE: ['shift+e'],
 	SEEK_FORWARD: ['right'],
 	SEEK_BACKWARD: ['left'],

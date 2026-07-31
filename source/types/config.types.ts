@@ -39,7 +39,6 @@ export interface Config {
 	streamQuality?: 'low' | 'medium' | 'high';
 	audioNormalization?: boolean;
 	gaplessPlayback?: boolean;
-	crossfadeDuration?: number;
 	volumeFadeDuration?: number;
 	equalizerPreset?: EqualizerPreset;
 	notifications?: boolean;

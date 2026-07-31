@@ -269,7 +269,6 @@ class WebServerManager {
 						audioNormalization: config.get('audioNormalization') ?? false,
 						proxy: config.get('proxy'),
 						gaplessPlayback: config.get('gaplessPlayback') ?? true,
-						crossfadeDuration: config.get('crossfadeDuration') ?? 0,
 						equalizerPreset: config.get('equalizerPreset') ?? 'flat',
 						volumeFadeDuration: config.get('volumeFadeDuration') ?? 0,
 					});

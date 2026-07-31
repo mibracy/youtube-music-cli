@@ -221,14 +221,14 @@ test('settings overlay navigates and cycles rows', async t => {
 	const overlay = createSettingsOverlayState();
 	openSettingsOverlay(overlay);
 	t.true(overlay.active);
-	t.is(SETTINGS_ROW_COUNT, 26);
+	t.is(SETTINGS_ROW_COUNT, 25);
 
 	t.is(handleSettingsInput(overlay, 'down', SETTINGS_ROW_COUNT), 'none');
 	t.is(overlay.selectedIndex, 1);
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'cycle');
-	overlay.selectedIndex = 10;
+	overlay.selectedIndex = 9;
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'begin_text');
-	overlay.selectedIndex = 22;
+	overlay.selectedIndex = 21;
 	t.is(handleSettingsInput(overlay, 'enter', SETTINGS_ROW_COUNT), 'navigate');
 	t.is(handleSettingsInput(overlay, 'escape', SETTINGS_ROW_COUNT), 'close');
 	t.false(overlay.active);
@@ -249,12 +249,12 @@ test('immersive settings items match TUI row count and cycle values', async t =>
 	const sleepTimer = createSleepTimerState();
 	const rows = buildImmersiveSettingsRows(config);
 
-	t.is(rows.length, 26);
+	t.is(rows.length, 25);
 	t.true(rows[0]?.label.includes('Stream Quality'));
-	t.true(rows[21]?.label.includes('Sleep Timer'));
-	t.true(rows[25]?.label.includes('Manage Plugins'));
+	t.true(rows[20]?.label.includes('Sleep Timer'));
+	t.true(rows[24]?.label.includes('Manage Plugins'));
 
-	const message = cycleImmersiveSetting(config, 6, {
+	const message = cycleImmersiveSetting(config, 5, {
 		sleepTimer,
 		onSleepTimerExpire: () => {},
 	});
