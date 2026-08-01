@@ -77,6 +77,11 @@ export interface AddToQueueAction {
 	track: Track;
 }
 
+export interface AddAutoplayTracksAction {
+	readonly category: 'ADD_AUTOPLAY_TRACKS';
+	tracks: Track[];
+}
+
 export interface PlayNextAction {
 	readonly category: 'PLAY_NEXT';
 	track: Track;

@@ -8,6 +8,7 @@ import {
 	type ReactNode,
 } from 'react';
 import type {PlayerState, PlayerAction} from '../types/player.types.ts';
+import {shouldAdvanceOnEof} from '../services/player/mpv-event-policy.ts';
 import {getPlayerService} from '../services/player/player.service.ts';
 import {
 	loadPlayerState,
@@ -99,14 +100,28 @@ export function playerReducer(
 			};
 
 		case 'NEXT': {
+			logger.debug('PlayerReducer', 'NEXT', {
+				currentVideoId: state.currentTrack?.videoId,
+				queuePosition: state.queuePosition,
+				queue: state.queue.map(t => t.videoId),
+				shuffle: state.shuffle,
+				repeat: state.repeat,
+			});
 			if (state.queue.length === 0) return state;
 
-			// Shuffle mode: pick a random track excluding the current position
+			// Shuffle mode: pick a random track. Exclude the current track's
+			// actual position in the queue when it is anchored there. In
+			// standalone playback the queue position is just an up-next pointer
+			// — excluding it would make the first queued song unselectable.
 			if (state.shuffle && state.queue.length > 1) {
+				const currentAtPosition =
+					state.queue[state.queuePosition]?.videoId ===
+					state.currentTrack?.videoId;
+				const excludeIndex = currentAtPosition ? state.queuePosition : -1;
 				let randomIndex: number;
 				do {
 					randomIndex = Math.floor(Math.random() * state.queue.length);
-				} while (randomIndex === state.queuePosition);
+				} while (randomIndex === excludeIndex);
 				return {
 					...state,
 					queuePosition: randomIndex,
@@ -117,15 +132,26 @@ export function playerReducer(
 				};
 			}
 
-			// If the current track isn't in the queue (standalone play),
-			// advance to the first track in the queue instead of skipping it
-			const currentInQueue = state.queue.some(
-				t => t.videoId === state.currentTrack?.videoId,
-			);
-			const basePosition = currentInQueue ? state.queuePosition : -1;
+			// Advance from the queue position only when the current track is
+			// actually playing from it. A standalone track that was later added
+			// to the queue (e.g. via 'q') lives elsewhere in it, and queuePosition
+			// is still just the "up next" pointer — starting from it would skip
+			// the first queued song. In that case advance to the queue start.
+			const currentAtPosition =
+				state.queue[state.queuePosition]?.videoId ===
+				state.currentTrack?.videoId;
+			const basePosition = currentAtPosition ? state.queuePosition : -1;
 
 			// Sequential mode
 			const nextPosition = basePosition + 1;
+			const nextTrackVideoId = state.queue[nextPosition]?.videoId ?? null;
+			logger.debug('PlayerReducer', 'NEXT sequential', {
+				currentAtPosition,
+				basePosition,
+				nextPosition,
+				nextTrackVideoId,
+				queueLength: state.queue.length,
+			});
 			if (nextPosition >= state.queue.length) {
 				if (state.repeat === 'all') {
 					return {
@@ -234,14 +260,36 @@ export function playerReducer(
 				...state,
 				queue: action.queue,
 				queuePosition: 0,
+				explicitQueueLength: action.queue.length,
 			};
 
-		case 'ADD_TO_QUEUE':
+		case 'ADD_TO_QUEUE': {
+			// In standalone playback the queue is filled with autoplay
+			// suggestions that may have arrived before the user queued tracks.
+			// Insert explicit additions at the front of that region so they play
+			// first instead of being skipped in favor of suggestions.
+			const currentAtPosition =
+				state.queue[state.queuePosition]?.videoId ===
+				state.currentTrack?.videoId;
+			const explicitCount = state.explicitQueueLength ?? 0;
+			const insertAt = currentAtPosition
+				? state.queue.length
+				: Math.min(explicitCount, state.queue.length);
+			const newQueue = [...state.queue];
+			newQueue.splice(insertAt, 0, action.track);
 			return {
 				...state,
-				queue: [...state.queue, action.track],
-				explicitQueueLength:
-					(state.explicitQueueLength ?? state.queue.length) + 1,
+				queue: newQueue,
+				explicitQueueLength: explicitCount + 1,
+			};
+		}
+
+		case 'ADD_AUTOPLAY_TRACKS':
+			// Autoplay filler — appends without counting as explicit queue
+			// additions, so user-queued tracks always take precedence.
+			return {
+				...state,
+				queue: [...state.queue, ...action.tracks],
 			};
 
 		case 'PLAY_NEXT': {
@@ -273,10 +321,19 @@ export function playerReducer(
 				);
 			}
 
-			return {...state, queue: newQueue, queuePosition};
-		}
+			const explicitBase = state.explicitQueueLength ?? 0;
+		const wasExplicit = action.index < explicitBase;
+		return {
+			...state,
+			queue: newQueue,
+			queuePosition,
+			explicitQueueLength: wasExplicit
+				? Math.max(0, explicitBase - 1)
+				: explicitBase,
+		};
+	}
 
-		case 'MOVE_IN_QUEUE': {
+	case 'MOVE_IN_QUEUE': {
 			const {from, to} = action;
 			const newQueue = [...state.queue];
 			if (
@@ -322,6 +379,7 @@ export function playerReducer(
 				...state,
 				queue: [],
 				queuePosition: 0,
+				explicitQueueLength: 0,
 				isPlaying: false,
 			};
 
@@ -330,6 +388,7 @@ export function playerReducer(
 				...state,
 				queue: [],
 				queuePosition: 0,
+				explicitQueueLength: 0,
 			};
 
 		case 'CLEAR_QUEUE_AFTER_CURRENT': {
@@ -337,6 +396,10 @@ export function playerReducer(
 			return {
 				...state,
 				queue: state.queue.slice(0, cutoff),
+				explicitQueueLength: Math.min(
+					state.explicitQueueLength ?? 0,
+					cutoff,
+				),
 			};
 		}
 
@@ -448,6 +511,7 @@ export function playerReducer(
 				shuffle: action.shuffle,
 				repeat: action.repeat,
 				autoplay: action.autoplay ?? true,
+				explicitQueueLength: action.explicitQueueLength ?? 0,
 				isPlaying: false, // Don't auto-play restored state
 				abLoop: {a: null, b: null},
 			};
@@ -527,6 +591,10 @@ function PlayerManager() {
 	useEffect(() => {
 		let lastProgressUpdate = 0;
 		const PROGRESS_THROTTLE_MS = 1000; // Update progress max once per second
+		// Whether the current track produced any progress. EOF without progress
+		// means the load failed (mpv went idle) — advancing would skip the song
+		// that follows the failed one.
+		let hasProgress = false;
 
 		playerService.onEvent(event => {
 			// Log all events at debug level to trace volume-pause correlation
@@ -544,6 +612,7 @@ function PlayerManager() {
 			}
 
 			if (event.timePos !== undefined) {
+				hasProgress = true;
 				// Throttle progress updates to reduce re-renders
 				const now = Date.now();
 				if (now - lastProgressUpdate >= PROGRESS_THROTTLE_MS) {
@@ -557,8 +626,25 @@ function PlayerManager() {
 				// pause event that immediately follows EOF (idle state).
 				const now = Date.now();
 				eofTimestampRef.current = now;
-				next();
-				lastAutoNextRef.current = now;
+
+				if (shouldAdvanceOnEof(hasProgress)) {
+					// Track ended normally — advance to next track
+					next();
+					lastAutoNextRef.current = now;
+				} else {
+					// No progress received — track was unavailable or failed to play.
+					// Set error instead of skipping the next song in the queue.
+					logger.warn(
+						'PlayerManager',
+						'EOF without progress — track may be unavailable',
+					);
+					dispatch({
+						category: 'SET_ERROR',
+						error: 'Track unavailable or failed to play',
+					});
+				}
+
+				hasProgress = false;
 			}
 
 			if (event.paused !== undefined) {
@@ -1007,9 +1093,7 @@ function PlayerManager() {
 
 		fetchPromise
 			.then(tracks => {
-				for (const track of tracks) {
-					dispatch({category: 'ADD_TO_QUEUE', track});
-				}
+				dispatch({category: 'ADD_AUTOPLAY_TRACKS', tracks});
 
 				logger.info(
 					state.radioIsActive ? 'Radio' : 'Autoplay',
@@ -1108,6 +1192,8 @@ export function PlayerProvider({children}: {children: ReactNode}) {
 					shuffle: persistedState.shuffle,
 					repeat: persistedState.repeat,
 					autoplay: persistedState.autoplay ?? true,
+					explicitQueueLength:
+						persistedState.explicitQueueLength ?? 0,
 				});
 			}
 		});

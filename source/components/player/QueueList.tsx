@@ -31,14 +31,13 @@ function QueueList() {
 		return Math.max(20, Math.floor(baseLength * scale));
 	};
 
-	// When the playing track isn't part of the queue (standalone play),
-	// show queued tracks from the start instead of after the queue position,
-	// so tracks added with 'q' are visible.
+	// When the playing track isn't at the queue position (standalone play, or
+	// a standalone track later added to the queue), show queued tracks from
+	// the start so tracks added with 'q' are visible.
 	const currentTrackId = playerState.currentTrack?.videoId;
-	const currentInQueue = playerState.queue.some(
-		track => track.videoId === currentTrackId,
-	);
-	const startIndex = currentInQueue
+	const currentAtPosition =
+		playerState.queue[playerState.queuePosition]?.videoId === currentTrackId;
+	const startIndex = currentAtPosition
 		? playerState.queuePosition + 1
 		: playerState.queuePosition;
 

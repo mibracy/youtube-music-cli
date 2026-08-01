@@ -63,3 +63,12 @@ export function shouldDebounceAdvance(
 ): boolean {
 	return now - lastAdvanceAt < ADVANCE_DEBOUNCE_MS;
 }
+
+/**
+ * Advance on EOF only when the track produced progress. A silent EOF (mpv
+ * dropped to idle with no file loaded) means the load failed — advancing
+ * would skip the next song in the queue for a track that never played.
+ */
+export function shouldAdvanceOnEof(hasProgress: boolean): boolean {
+	return hasProgress;
+}

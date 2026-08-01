@@ -87,6 +87,7 @@ export type PlayerAction =
 	| ToggleAutoplayAction
 	| SetQueueAction
 	| AddToQueueAction
+	| import('./actions.ts').AddAutoplayTracksAction
 	| PlayNextAction
 	| RemoveFromQueueAction
 	| MoveInQueueAction

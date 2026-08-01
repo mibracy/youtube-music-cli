@@ -98,6 +98,8 @@ function Initializer({flags}: {flags?: Flags}) {
 					shuffle: persistedState.shuffle,
 					repeat: persistedState.repeat,
 					autoplay: true,
+					explicitQueueLength:
+						persistedState.explicitQueueLength ?? 0,
 					playbackMode: persistedState.playbackMode ?? 'youtube',
 					currentStation: persistedState.currentStation ?? null,
 					radioIsActive: persistedState.radioIsActive ?? false,

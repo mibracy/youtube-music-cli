@@ -34,6 +34,7 @@ function makeState(overrides = {}) {
 		shuffle: false,
 		isLoading: false,
 		error: null,
+		explicitQueueLength: 0,
 		...overrides,
 	};
 }
@@ -198,6 +199,95 @@ test('NEXT with shuffle=false uses sequential order', async () => {
 	expect(next.currentTrack?.videoId).toBe('c');
 });
 
+test('NEXT from standalone track added to queue later starts at queue start', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	// Track 'x' was started standalone, then 'a'/'b'/'c' were queued and
+	// finally 'x' itself was appended (e.g. via 'q'). queuePosition is still
+	// the "up next" pointer at 0, but the current track is NOT at it — NEXT
+	// must play the first queued song, not skip it.
+	const state = makeState({
+		shuffle: false,
+		queue: [...['a', 'b', 'c'].map(makeTrack), makeTrack('x')],
+		queuePosition: 0,
+		currentTrack: makeTrack('x'),
+	});
+	const next = playerReducer(state, {category: 'NEXT'});
+	expect(next.currentTrack?.videoId).toBe('a');
+	expect(next.queuePosition).toBe(0);
+});
+
+test('NEXT with shuffle=true and standalone track picks from all queued tracks', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const tracks = ['s1', 's2', 't1'].map(makeTrack);
+	const state = makeState({
+		shuffle: true,
+		queue: tracks,
+		queuePosition: 0,
+		currentTrack: makeTrack('x'), // standalone, not in queue
+	});
+
+	// In standalone shuffle the first queued track (index 0) must be eligible.
+	let hitZero = false;
+	for (let i = 0; i < 30; i++) {
+		const next = playerReducer(state, {category: 'NEXT'});
+		expect(next.queuePosition).not.toBe(-1);
+		if (next.queuePosition === 0) hitZero = true;
+	}
+	expect(hitZero).toBe(true);
+});
+
+test('standalone queue: user additions play before autoplay suggestions', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const current = makeTrack('x');
+
+	// Play X standalone, then autoplay suggestions arrive first.
+	let state = makeState({currentTrack: current, queue: [], queuePosition: 0});
+	state = playerReducer(state, {
+		category: 'ADD_AUTOPLAY_TRACKS',
+		tracks: ['t1', 't2', 't3'].map(makeTrack),
+	});
+	expect(state.queue.map(t => t.videoId)).toEqual(['t1', 't2', 't3']);
+	expect(state.explicitQueueLength).toBe(0);
+
+	// User adds two songs via 'q' — they must land ahead of the suggestions.
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s1')});
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s2')});
+	expect(state.queue.map(t => t.videoId)).toEqual([
+		's1',
+		's2',
+		't1',
+		't2',
+		't3',
+	]);
+	expect(state.explicitQueueLength).toBe(2);
+
+	// Skip must play the first user-added song, not the first suggestion.
+	const next = playerReducer(state, {category: 'NEXT'});
+	expect(next.currentTrack?.videoId).toBe('s1');
+	expect(next.queuePosition).toBe(0);
+});
+
+test('standalone queue: suggestions appended while anchored go to the end', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+
+	// User queued first, then suggestions arrived — plain append after them.
+	let state = makeState({
+		currentTrack: makeTrack('x'),
+		queue: [],
+		queuePosition: 0,
+	});
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s1')});
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s2')});
+	state = playerReducer(state, {
+		category: 'ADD_AUTOPLAY_TRACKS',
+		tracks: ['t1', 't2'].map(makeTrack),
+	});
+	expect(state.queue.map(t => t.videoId)).toEqual(['s1', 's2', 't1', 't2']);
+
+	const next = playerReducer(state, {category: 'NEXT'});
+	expect(next.currentTrack?.videoId).toBe('s1');
+});
+
 test('PREVIOUS is unaffected by shuffle state', async () => {
 	const {playerReducer} = await import('../source/stores/player.store.tsx');
 	const tracks = ['a', 'b', 'c'].map(makeTrack);
@@ -245,4 +335,108 @@ test('discord rpc service no-ops when disabled', async () => {
 	await rpc.clearActivity();
 
 	expect(true).toBe(true);
+});
+
+// ── explicitQueueLength maintenance tests ─────────────────────────────────────
+
+test('CLEAR_QUEUE resets explicitQueueLength', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({
+		queue: ['a', 'b', 'c'].map(makeTrack),
+		explicitQueueLength: 3,
+		queuePosition: 1,
+	});
+	const next = playerReducer(state, {category: 'CLEAR_QUEUE'});
+	expect(next.explicitQueueLength).toBe(0);
+	expect(next.queue).toEqual([]);
+});
+
+test('CLEAR_QUEUE_KEEP_CURRENT resets explicitQueueLength', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({
+		queue: ['a', 'b', 'c'].map(makeTrack),
+		explicitQueueLength: 3,
+	});
+	const next = playerReducer(state, {category: 'CLEAR_QUEUE_KEEP_CURRENT'});
+	expect(next.explicitQueueLength).toBe(0);
+});
+
+test('CLEAR_QUEUE_AFTER_CURRENT clamps explicitQueueLength', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({
+		queue: ['a', 'b', 'c', 'd', 'e'].map(makeTrack),
+		explicitQueueLength: 5,
+		queuePosition: 2,
+	});
+	const next = playerReducer(state, {category: 'CLEAR_QUEUE_AFTER_CURRENT'});
+	expect(next.explicitQueueLength).toBe(3);
+	expect(next.queue.map(t => t.videoId)).toEqual(['a', 'b', 'c']);
+});
+
+test('SET_QUEUE sets explicitQueueLength to queue length', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const queue = ['x', 'y', 'z'].map(makeTrack);
+	const next = playerReducer(makeState(), {category: 'SET_QUEUE', queue});
+	expect(next.explicitQueueLength).toBe(3);
+});
+
+test('REMOVE_FROM_QUEUE decrements explicitQueueLength for explicit region', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({
+		queue: ['a', 'b', 't1', 't2'].map(makeTrack),
+		explicitQueueLength: 2,
+		queuePosition: 0,
+	});
+	// Remove from explicit region (index 1 < explicitQueueLength 2)
+	const next = playerReducer(state, {category: 'REMOVE_FROM_QUEUE', index: 1});
+	expect(next.explicitQueueLength).toBe(1);
+});
+
+test('REMOVE_FROM_QUEUE does not decrement explicitQueueLength for autoplay region', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+	const state = makeState({
+		queue: ['a', 'b', 't1', 't2'].map(makeTrack),
+		explicitQueueLength: 2,
+		queuePosition: 0,
+	});
+	// Remove from autoplay region (index 2 >= explicitQueueLength 2)
+	const next = playerReducer(state, {category: 'REMOVE_FROM_QUEUE', index: 2});
+	expect(next.explicitQueueLength).toBe(2);
+});
+
+test('standalone queue: stale explicitQueueLength does not break user additions', async () => {
+	const {playerReducer} = await import('../source/stores/player.store.tsx');
+
+	// Simulate a previously populated queue that was cleared (CLEAR_QUEUE
+	// now resets explicitQueueLength, but verify the behavior is correct
+	// even when starting from a clean CLEAR_QUEUE).
+	let state = makeState({
+		currentTrack: makeTrack('x'),
+		queue: ['a', 'b', 'c'].map(makeTrack),
+		explicitQueueLength: 3,
+		queuePosition: 1,
+	});
+
+	// Clear the queue (simulates user clicking a new song)
+	state = playerReducer(state, {category: 'CLEAR_QUEUE'});
+	expect(state.explicitQueueLength).toBe(0);
+
+	// Autoplay suggestions arrive
+	state = playerReducer(state, {
+		category: 'ADD_AUTOPLAY_TRACKS',
+		tracks: ['t1', 't2', 't3'].map(makeTrack),
+	});
+
+	// User queues two tracks – must land before suggestions
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s1')});
+	state = playerReducer(state, {category: 'ADD_TO_QUEUE', track: makeTrack('s2')});
+
+	expect(state.queue.map(t => t.videoId)).toEqual([
+		's1',
+		's2',
+		't1',
+		't2',
+		't3',
+	]);
+	expect(state.explicitQueueLength).toBe(2);
 });

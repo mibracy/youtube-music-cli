@@ -59,3 +59,16 @@ test('mpv-event-policy: debounces EOF advance', async () => {
 		shouldDebounceAdvance(-ADVANCE_DEBOUNCE_MS, ADVANCE_DEBOUNCE_MS - 1),
 	).toBe(false);
 });
+
+test('mpv-event-policy: advances on EOF only when the track produced progress', async () => {
+	const {shouldAdvanceOnEof} =
+		await import('../source/services/player/mpv-event-policy.ts');
+
+	// Normal track end: progress was received, so advance to the next track.
+	expect(shouldAdvanceOnEof(true)).toBe(true);
+
+	// Failed/silent load: no progress ever arrived (mpv dropped to idle),
+	// so EOF must NOT advance — otherwise the next song in the queue gets
+	// skipped for a track that never played.
+	expect(shouldAdvanceOnEof(false)).toBe(false);
+});
