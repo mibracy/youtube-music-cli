@@ -26,7 +26,7 @@ export default function HomeLayout() {
 	const {theme} = useTheme();
 	const {dispatch} = useNavigation();
 	const {history} = useHistory();
-	const {favorites, toggleFavorite} = useFavorites();
+	const {favorites} = useFavorites();
 	const {state: playerState, play} = usePlayer();
 	const {columns, rows} = useTerminalSize();
 
@@ -221,12 +221,6 @@ export default function HomeLayout() {
 	useKeyBinding(KEYBINDINGS.SEARCH, () =>
 		dispatch({category: 'NAVIGATE', view: VIEW.SEARCH}),
 	);
-
-	useKeyBinding(KEYBINDINGS.TOGGLE_FAVORITE, () => {
-		if (playerState.currentTrack) {
-			toggleFavorite(playerState.currentTrack);
-		}
-	});
 
 	useInput((_input, key) => {
 		if (shouldHideMenus) return;

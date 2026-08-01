@@ -4,6 +4,7 @@ import {Box, Text} from 'ink';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
 import {useKeyBinding, getHighlightedTrack} from '../../hooks/useKeyboard.tsx';
+import {useFavorites} from '../../stores/favorites.store.tsx';
 import {KEYBINDINGS} from '../../utils/constants.ts';
 import {ICONS} from '../../utils/icons.ts';
 import {logger} from '../../services/logger/logger.service.ts';
@@ -31,6 +32,8 @@ export default function ShortcutsBar() {
 		stopRadio,
 		addToQueue,
 	} = usePlayer();
+
+	const {toggleFavorite} = useFavorites();
 
 	const [flashState, setFlashState] = useState<Record<string, boolean>>({});
 	const [navError, setNavError] = useState<string | null>(null);
@@ -126,6 +129,13 @@ export default function ShortcutsBar() {
 		const track = getHighlightedTrack();
 		if (track) {
 			addToQueue(track);
+		}
+	});
+	useKeyBinding(KEYBINDINGS.TOGGLE_FAVORITE, () => {
+		flash('favorite');
+		const track = getHighlightedTrack() ?? playerState.currentTrack;
+		if (track) {
+			toggleFavorite(track);
 		}
 	});
 	// Note: SETTINGS keybinding handled by MainLayout to avoid double-dispatch

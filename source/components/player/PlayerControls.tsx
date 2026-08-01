@@ -1,11 +1,9 @@
 // Player controls component
 import {useKeyBinding} from '../../hooks/useKeyboard.tsx';
 import {getConfigService} from '../../services/config/config.service.ts';
-import {KEYBINDINGS, VIEW} from '../../utils/constants.ts';
+import {KEYBINDINGS} from '../../utils/constants.ts';
 import {usePlayer} from '../../hooks/usePlayer.ts';
 import {useTheme} from '../../hooks/useTheme.ts';
-import {useFavorites} from '../../stores/favorites.store.tsx';
-import {useNavigation} from '../../hooks/useNavigation.ts';
 import {Box, Text} from 'ink';
 import {useEffect, useState} from 'react';
 import {logger} from '../../services/logger/logger.service.ts';
@@ -53,8 +51,6 @@ export default function PlayerControls() {
 		startRadio,
 		stopRadio,
 	} = usePlayer();
-	const {toggleFavorite} = useFavorites();
-	const {state: navState} = useNavigation();
 	const config = getConfigService();
 	const [gaplessPlayback, setGaplessPlayback] = useState(
 		config.get('gaplessPlayback') ?? true,
@@ -110,11 +106,6 @@ export default function PlayerControls() {
 	useKeyBinding(KEYBINDINGS.AB_LOOP_A, handleABLoopA);
 	useKeyBinding(KEYBINDINGS.AB_LOOP_B, handleABLoopB);
 	useKeyBinding(KEYBINDINGS.AB_LOOP_CLEAR, handleABLoopClear);
-	useKeyBinding(KEYBINDINGS.TOGGLE_FAVORITE, () => {
-		if (playerState.currentTrack && navState.currentView !== VIEW.RADIO) {
-			toggleFavorite(playerState.currentTrack);
-		}
-	});
 	useKeyBinding(KEYBINDINGS.TOGGLE_SUBTITLES, () => {
 		const current = config.get('subtitlesEnabled') ?? false;
 		config.set('subtitlesEnabled', !current);
